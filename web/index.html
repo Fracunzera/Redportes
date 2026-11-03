@@ -22,8 +22,8 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--papel);color:var(--tinta);font:18px/1.6 var(--texto)}
-img{max-width:100%;display:block}
+body{margin:0;overflow-x:hidden;background:var(--papel);color:var(--tinta);font:18px/1.6 var(--texto)}
+img{max-width:100%;height:auto;display:block}
 a{color:var(--cable)}
 a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--consola);outline-offset:3px;border-radius:6px}
 .envoltura{max-width:1160px;margin:0 auto;padding:0 28px}
@@ -79,10 +79,11 @@ h2{font:800 clamp(30px,3.6vw,44px)/1.08 var(--titulo);letter-spacing:-.02em;marg
 .pasos p{margin:0;color:var(--tinta-suave)}
 
 .muestra{background:var(--papel-2)}
-.muestra-grilla{display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:start}
-.capturas{position:relative;padding-bottom:70px}
+.muestra-grilla{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:56px;align-items:start}
+.portada>*,.muestra-grilla>*,.preguntas-grilla>*{min-width:0}
+.capturas{position:relative;padding-bottom:70px;margin-right:6%}
 .capturas img{border-radius:10px;box-shadow:0 1px 0 rgba(14,35,64,.08),0 18px 40px -18px rgba(14,35,64,.45)}
-.capturas img+img{position:absolute;width:62%;right:-18px;bottom:0;border:4px solid var(--papel-2)}
+.capturas a+a img{position:absolute;width:58%;right:0;bottom:0;border:4px solid var(--papel-2)}
 .funciones{margin:0}
 .funciones dt{font:700 19px/1.3 var(--titulo);margin-top:22px;display:flex;gap:10px;align-items:baseline}
 .funciones dt::before{content:"";flex:none;width:12px;height:12px;border-radius:50%;background:var(--c,var(--cable));transform:translateY(-1px)}
@@ -118,7 +119,7 @@ footer .envoltura{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
   .pasos li+li{padding-left:0;border-left:0;border-top:2px solid var(--papel-2)}
   .limites ul{grid-template-columns:1fr}
   .barra nav{display:none}
-  .capturas img+img{right:0}
+  .capturas a+a img{right:0}
 }
 </style>
 </head>
@@ -227,8 +228,8 @@ footer .envoltura{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
 <section class="muestra" id="que-muestra">
   <div class="envoltura muestra-grilla">
     <div class="capturas">
-      <img src="img/informe.jpg" alt="Informe de ejemplo: salud de la red 47 sobre 100, mapa con el router, cámaras, impresora y un MikroTik, y salida a Internet por CGNAT." width="1080" height="1350" loading="lazy">
-      <img src="img/hallazgos.jpg" alt="Lista de cosas para revisar con el comando para arreglar cada una." width="1080" height="1350" loading="lazy">
+      <a href="img/informe.jpg" title="Ver en grande"><img src="img/informe.jpg" alt="Informe de ejemplo: salud de la red 47 sobre 100, mapa con el router, cámaras, impresora y un MikroTik, y salida a Internet por CGNAT." width="1080" height="1350" loading="lazy"></a>
+      <a href="img/hallazgos.jpg" title="Ver en grande"><img src="img/hallazgos.jpg" alt="Lista de cosas para revisar con el comando para arreglar cada una." width="1080" height="1350" loading="lazy"></a>
     </div>
     <div>
       <h2>Lo que vas a ver</h2>
