@@ -20,8 +20,20 @@ jobs:
 
       - name: Base de fabricantes (IEEE) para incluir en el instalador
         continue-on-error: true
-        timeout-minutes: 3
-        run: python -c "from pathlib import Path; from redportes import oui; oui.URL_WIRESHARK = ''; print(oui.actualizar_base(Path('redportes/recursos/oui.csv')), 'fabricantes')"
+        timeout-minutes: 6
+        shell: python
+        run: |
+          import time
+          from pathlib import Path
+          from redportes import oui
+          oui.URL_WIRESHARK = ""  # solo la IEEE para redistribuir
+          for intento in range(4):
+              try:
+                  print(oui.actualizar_base(Path("redportes/recursos/oui.csv")), "fabricantes")
+                  break
+              except Exception as e:
+                  print("intento", intento + 1, "falló:", e)
+                  time.sleep(20)
 
       - name: Dependencias
         run: pip install . pyinstaller pytest
