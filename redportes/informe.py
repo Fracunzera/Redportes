@@ -335,6 +335,32 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
                 for c in cambios["cambios"]) + "</ul>")
         partes.append("</section>")
 
+    # Este equipo
+    el = r.get("equipo_local")
+    if el:
+        s_ = el["sistema"]
+        pr = next((i for i in el["interfaces"] if i.get("principal")), None)
+        filas = [("Equipo", f"{s_['nombre']} — {s_['version']}")]
+        if pr:
+            conf = ""
+            if "dhcp" in pr:
+                conf = (" · DHCP" + (f" de {pr['servidor_dhcp']}" if pr.get("servidor_dhcp") else "")) \
+                    if pr["dhcp"] else " · IP fija"
+            vel = f" · {pr['velocidad_mbps']} Mb/s" if pr.get("velocidad_mbps") else ""
+            filas.append(("Conexión", f"{pr['nombre']} ({pr['tipo']}) · {pr['ip']} · MAC {pr['mac']}{conf}{vel}"))
+        w = el.get("wifi") or {}
+        if w:
+            filas.append(("Wi-Fi", f"«{w.get('ssid')}» · señal {w.get('senal')}% · canal {w.get('canal')} "
+                                   f"{w.get('banda', '')} · {w.get('seguridad', '')}"))
+        if el.get("proxy"):
+            filas.append(("Proxy", el["proxy"]))
+        obs = [o for o in el["observaciones"] if o["estado"] != "ok"]
+        partes.append('<section><h2>Equipo desde el que se escaneó</h2><div class="tabla"><table><tbody>'
+                      + "".join(f"<tr><th>{_e(a)}</th><td>{_e(b)}</td></tr>" for a, b in filas)
+                      + "</tbody></table></div>"
+                      + ("<ul>" + "".join(f"<li>{_e(o['texto'])}</li>" for o in obs) + "</ul>" if obs else "")
+                      + "</section>")
+
     # Tabla de equipos
     partes.append('<section><h2>Equipos</h2><div class="tabla"><table><thead><tr>'
                   '<th>IP</th><th>Tipo</th><th>Fabricante</th><th>MAC</th><th>Nombre</th>'

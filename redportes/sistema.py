@@ -17,14 +17,21 @@ def tiene(programa: str) -> bool:
     return shutil.which(programa) is not None
 
 
-def ejecutar(cmd: list[str], timeout: float = 10) -> str:
-    """Ejecuta un comando y devuelve su salida estándar (vacía si falla)."""
+def ejecutar(cmd: list[str], timeout: float = 10, encoding: str | None = None) -> str:
+    """Ejecuta un comando y devuelve su salida estándar (vacía si falla).
+
+    En Windows, los comandos de consola (netsh, ipconfig) escriben en la página de códigos OEM:
+    con encoding="oem" se leen bien los acentos («Señal», «Autenticación»).
+    """
+    if encoding == "oem" and not ES_WINDOWS:
+        encoding = None
     try:
         r = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
+            encoding=encoding,
             errors="replace",
             # En Windows evita que se abra una ventana de consola por cada ping.
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),

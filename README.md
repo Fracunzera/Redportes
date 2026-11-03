@@ -19,6 +19,7 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 - **Cómo sale a Internet** (opcional, con `--internet`): saltos hasta Internet, doble NAT, CGNAT, IP pública y qué DNS usa.
 - **Qué se ve desde Internet** (con `--internet`): consulta pasiva a [Shodan InternetDB](https://internetdb.shodan.io/) sobre la IP pública: puertos publicados (RDP, cámaras, Winbox…) y vulnerabilidades conocidas. No escanea nada; con CGNAT avisa que esa IP no es de tu red.
 - **Diagnóstico de conexión** (pestaña *Diagnóstico* o `redportes diagnostico`): ping al router y a Internet con pérdida, latencia y jitter, prueba de cada DNS configurado contra uno público y navegación HTTPS real. Dice en castellano si el problema es la red local, el proveedor o el DNS, y se copia con un botón para pegarlo en un chat o ticket.
+- **Este equipo** (pestaña o `redportes equipo`): la configuración de la PC desde la que escaneás. IP, máscara, MAC, si viene por DHCP (y de qué servidor) o es fija, velocidad y dúplex del enlace, MTU, Wi-Fi (red, señal, canal, banda, seguridad), proxy, firewall, archivo hosts, sistema, RAM y disco. Avisa lo que suele dar problemas: cable negociando a 100 Mb/s, señal débil, Wi-Fi abierto o WEP, IP fija, firewall apagado, IP 169.254.
 - **Salud de la red (0 a 100)** con semáforo y los motivos del puntaje: un número que entiende cualquiera.
 - **Visitas por cliente**: guarda cada escaneo y en la siguiente visita te dice qué equipos son nuevos, cuáles ya no están y qué puertos se abrieron o cerraron.
 - **Informe mensual**: evolución de la salud, equipos nuevos y desaparecidos, problemas resueltos y nuevos, pendientes y un resumen listo para pegar en una nota.
@@ -86,6 +87,7 @@ redportes programar --listar
 redportes mensual -c "Oficina" --mes 2026-11 --abrir
 redportes inventario -c "Oficina" -o inventario.csv
 redportes diagnostico                          # ¿anda mal la red, el proveedor o el DNS?
+redportes equipo                               # configuración de esta computadora
 ```
 
 ## Redes grandes

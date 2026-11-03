@@ -123,6 +123,7 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         "dns": describir_dns(servidores_dns(), puerta),
         "wan": datos_wan,
         "diagnostico": diag,
+        "equipo_local": _equipo_local(),
         "sistema": SO,
         "admin": es_admin(),
         "nmap": usar_nmap and tiene("nmap"),
@@ -134,6 +135,15 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
 
     r["salud"] = salud.calcular(r)
     return r
+
+
+def _equipo_local() -> dict | None:
+    try:
+        from redportes import equipo_local
+
+        return equipo_local.recolectar()
+    except Exception:  # noqa: BLE001 — nunca debe frenar el escaneo
+        return None
 
 
 def _orden_ip(ip: str) -> int:

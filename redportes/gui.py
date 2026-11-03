@@ -203,6 +203,30 @@ class App:
         self.diag: dict | None = None
         self.nb.add(p6, text="Diagnóstico")
 
+        p7 = ttk.Frame(self.nb, padding=6)
+        barra7 = ttk.Frame(p7)
+        barra7.pack(fill="x", pady=(0, 6))
+        self.b_local = ttk.Button(barra7, text="Ver configuración", style="Accion.TButton",
+                                  command=self.ver_equipo_local)
+        self.b_local.pack(side="left")
+        self.b_copiar_local = ttk.Button(barra7, text="Copiar resultado", command=self.copiar_equipo_local,
+                                         state="disabled")
+        self.b_copiar_local.pack(side="left", padx=6)
+        ttk.Label(barra7, text="Red, Wi-Fi y sistema de esta computadora. Solo lectura.",
+                  foreground="#64748b").pack(side="left", padx=8)
+        self.t_local = self._tabla(p7, {"Dato": 260, "Valor": 580})
+        self.t_local.column("Valor", stretch=True)
+        self.t_local.tag_configure("seccion", background="#e2e8f0", font=("TkDefaultFont", 10, "bold"))
+        self.txt_local = tk.Text(p7, height=6, wrap="word", relief="flat", padx=8, pady=6,
+                                 background="#f8fafc", font="TkDefaultFont")
+        self.txt_local.pack(fill="x", pady=(6, 0))
+        for est, color in (("falla", "#b91c1c"), ("aviso", "#a16207"), ("info", "#334155"), ("ok", "#15803d")):
+            self.txt_local.tag_configure(est, foreground=color)
+        self.local: dict | None = None
+        self.nb.add(p7, text="Este equipo")
+        self.p_local = p7
+        self.nb.bind("<<NotebookTabChanged>>", self._cambio_pestana)
+
         p4 = ttk.Frame(self.nb, padding=6)
         self.t_visitas = self._tabla(p4, {"N.º": 50, "Fecha": 160, "Cliente": 260, "Red": 160,
                                           "Equipos": 80})
@@ -340,6 +364,8 @@ class App:
                 if tipo == "progreso":
                     self.v_estado.set(dato)
                     self._log(dato)
+                elif tipo == "local":
+                    self._mostrar_equipo_local(dato)
                 elif tipo == "diag":
                     self._mostrar_diagnostico(dato)
                 elif tipo == "oui":
@@ -506,6 +532,97 @@ class App:
 
     def abrir_automatizar(self):
         Automatizar(self)
+
+    # ------------------------------------------------------------ este equipo
+
+    def _cambio_pestana(self, _evento=None):
+        if self.local is None and str(self.nb.select()) == str(self.p_local) \
+                and str(self.b_local["state"]) != "disabled":
+            self.ver_equipo_local()
+
+    def ver_equipo_local(self):
+        from redportes import equipo_local
+
+        self.b_local.configure(state="disabled")
+
+        def trabajo():
+            try:
+                self.cola.put(("local", equipo_local.recolectar()))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("local", {"error": str(e)}))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_equipo_local(self, d: dict):
+        self.b_local.configure(state="normal")
+        t = self.t_local
+        t.delete(*t.get_children())
+        self.txt_local.delete("1.0", "end")
+        if "error" in d:
+            self.txt_local.insert("end", f"No se pudo leer la configuración: {d['error']}")
+            return
+        self.local = d
+
+        def seccion(nombre, extra=""):
+            t.insert("", "end", values=(nombre, extra), tags=("seccion",))
+
+        def fila(dato, valor):
+            if valor not in (None, "", []):
+                t.insert("", "end", values=(f"   {dato}", valor))
+
+        s = d["sistema"]
+        seccion("Sistema")
+        fila("Nombre del equipo", s["nombre"])
+        fila("Sistema operativo", f"{s['version']} ({s['arquitectura']})")
+        fila("Encendido hace", f"{s['encendido_horas']} horas")
+        fila("Procesadores / RAM", f"{s['cpus']} núcleos · {s['ram_gb']} GB ({s['ram_uso']}% en uso)")
+        fila("Disco del sistema", f"{s['disco_libre_gb']} GB libres ({s['disco_uso']}% usado)")
+        for i in d["interfaces"]:
+            seccion(i["nombre"], i["tipo"] + (" · conexión principal" if i["principal"] else "")
+                    + (" · virtual" if i["virtual"] else ""))
+            fila("Dirección IP", f"{i['ip']} / {i['mascara']}")
+            fila("MAC", i["mac"])
+            if "dhcp" in i:
+                fila("Configuración", ("DHCP" + (f" (servidor {i['servidor_dhcp']})" if i.get("servidor_dhcp")
+                                                 else "")) if i["dhcp"] else "IP fija (manual)")
+            if i.get("velocidad_mbps"):
+                fila("Velocidad del enlace", f"{i['velocidad_mbps']} Mb/s"
+                     + (f", dúplex {i['duplex']}" if i.get("duplex") else ""))
+            fila("MTU", i.get("mtu"))
+        seccion("Ruteo y DNS")
+        fila("Puerta de enlace", d.get("puerta") or "—")
+        fila("Servidores DNS", ", ".join(d.get("dns") or []) or "—")
+        w = d.get("wifi") or {}
+        if w:
+            seccion("Wi-Fi")
+            fila("Red (SSID)", w.get("ssid"))
+            fila("Señal", f"{w['senal']}%" if w.get("senal") is not None else "")
+            fila("Canal / banda", f"{w.get('canal', '')} · {w.get('banda', '')}")
+            fila("Estándar", w.get("estandar"))
+            fila("Seguridad", " · ".join(x for x in (w.get("seguridad"), w.get("cifrado")) if x))
+            fila("Velocidad", f"{w.get('recepcion')} Mb/s" if w.get("recepcion") else "")
+            fila("Punto de acceso (BSSID)", w.get("bssid"))
+            fila("Adaptador", w.get("adaptador"))
+        seccion("Otros ajustes")
+        fila("Proxy", d.get("proxy") or "ninguno")
+        fw = d.get("firewall") or {}
+        if fw:
+            fila("Firewall de Windows", f"activo en {fw['activos']} de {fw['perfiles']} perfiles")
+        fila("Archivo hosts", f"{len(d['hosts'])} entrada(s) agregada(s)" if d.get("hosts") else "sin cambios")
+        for h in d.get("hosts", [])[:10]:
+            fila("", h)
+        icono = {"falla": "✖ ", "aviso": "⚠ ", "info": "• ", "ok": "✔ "}
+        for x in d["observaciones"]:
+            self.txt_local.insert("end", icono[x["estado"]] + x["texto"] + "\n", x["estado"])
+        self.b_copiar_local.configure(state="normal")
+
+    def copiar_equipo_local(self):
+        from redportes import equipo_local
+
+        if self.local:
+            self.raiz.clipboard_clear()
+            self.raiz.clipboard_append(equipo_local.como_texto(self.local))
+            self.v_estado.set("Configuración copiada.")
 
     # ------------------------------------------------------------ diagnóstico
 
