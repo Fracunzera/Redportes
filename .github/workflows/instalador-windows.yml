@@ -23,7 +23,8 @@ jobs:
         timeout-minutes: 6
         shell: python
         run: |
-          import time
+          import sys, time
+          sys.path.insert(0, ".")
           from pathlib import Path
           from redportes import oui
           oui.URL_WIRESHARK = ""  # solo la IEEE para redistribuir
