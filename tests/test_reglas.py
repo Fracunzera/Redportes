@@ -103,3 +103,12 @@ def test_informe_html():
     assert "192.168.50.60" in html and "<svg" in html
     assert "Panel web sin cifrar" in html
     assert "<script>alert" not in html  # todo escapado
+
+
+def test_mapa_agrupa_redes_grandes():
+    muchos = [eq(f"10.0.{i // 200}.{i % 200 + 1}", puertos=[23] if i == 5 else []) for i in range(400)]
+    r = _resultado(muchos)
+    r["red"] = "10.0.0.0/16"
+    html = informe.generar(r, None)
+    assert "10.0.0.0/24" in html and "200 equipos" in html
+    assert "agrupa por subred" in html

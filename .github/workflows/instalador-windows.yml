@@ -1,0 +1,64 @@
+name: instalador-windows
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias
+        run: pip install . pyinstaller pytest
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Versión
+        id: v
+        shell: bash
+        run: echo "version=$(python -c 'import redportes; print(redportes.__version__)')" >> "$GITHUB_OUTPUT"
+
+      - name: Ejecutable (PyInstaller)
+        run: >
+          pyinstaller --noconfirm --windowed --name Redportes
+          --icon redportes/recursos/icono.ico
+          --add-data "redportes/recursos;redportes/recursos"
+          empaquetado/redportes_gui.py
+
+      - name: Probar que el ejecutable arranca
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\Redportes\Redportes.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "El ejecutable se cerró solo (código $($p.ExitCode))" }
+          Stop-Process -Id $p.Id
+
+      - name: Instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersion=${{ steps.v.outputs.version }}" empaquetado\redportes.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC falló" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Redportes-instalador
+          path: dist/Redportes-*-instalador.exe
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Redportes-*-instalador.exe
+          generate_release_notes: true

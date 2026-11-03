@@ -60,3 +60,12 @@ def test_banner():
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows tiene SMB escuchando en 445")
 def test_smbv1_no_crashea_si_no_hay_servicio():
     assert puertos.acepta_smbv1("127.0.0.1", timeout=0.5) is False
+
+
+def test_ping_a_localhost():
+    from redportes import icmp
+
+    r = icmp.barrido(["127.0.0.1"], timeout=1.0)
+    if r is None:
+        pytest.skip("este sistema no permite sockets ICMP sin privilegios")
+    assert "127.0.0.1" in r

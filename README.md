@@ -29,6 +29,16 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 
 ## Instalación
 
+### Windows (con interfaz gráfica)
+
+Bajá el instalador `Redportes-x.y.z-instalador.exe` de la sección [Releases](https://github.com/Fracunzera/Redportes/releases/latest) y ejecutalo. No pide permisos de administrador ni necesita Python. Queda en el menú Inicio como **Redportes**.
+
+> Como el instalador no está firmado digitalmente, Windows puede mostrar *«Windows protegió su PC»*: tocá **Más información → Ejecutar de todas formas**.
+
+Los informes se guardan en `Documentos\Redportes`.
+
+### Línea de comandos (Linux, Windows, macOS)
+
 Necesitás Python 3.9 o superior.
 
 ```bash
@@ -39,6 +49,8 @@ pipx install git+https://github.com/Fracunzera/Redportes
 pip install git+https://github.com/Fracunzera/Redportes
 ```
 
+Esto instala también `redportes-gui`, la misma interfaz gráfica (en Linux necesita el paquete `python3-tk`).
+
 **Opcional pero recomendado:** instalar [nmap](https://nmap.org/download.html) (`sudo apt install nmap`). Redportes lo usa para el descubrimiento si está; si no, todo funciona igual con Python puro (ping, TCP y tabla ARP).
 
 **Opcional:** bajar la base completa de fabricantes de la IEEE (unos 5 MB, una sola vez):
@@ -48,6 +60,12 @@ redportes actualizar-oui
 ```
 
 Sin eso usa la base de nmap si está instalado, o una lista mínima incorporada (MikroTik, Ubiquiti, Hikvision, Dahua, Raspberry Pi, virtualización…).
+
+## Redes grandes
+
+El ping se hace sin lanzar procesos (socket ICMP en Linux/macOS, API nativa en Windows), así que una /16 lleva del orden de un minuto en Linux y unos pocos en Windows, más el tiempo de revisar puertos en los equipos que respondan. Hasta una /16 no pide confirmación; para redes más grandes hay que agregar `--forzar`. Con más de 96 equipos el mapa del informe los agrupa por /24.
+
+La MAC y el fabricante solo se pueden obtener de los equipos del mismo segmento de red (los que ve la tabla ARP). En subredes ruteadas el tipo de equipo se estima por puertos, banners y TTL.
 
 ## Uso
 
@@ -79,7 +97,7 @@ redportes informe 3 --abrir
 | `--abrir` | Abre el informe al terminar |
 | `--sin-nmap` | No usar nmap |
 | `--no-guardar` | No guardar en el historial |
-| `--forzar` | Permite redes de más de 1024 direcciones |
+| `--forzar` | Permite redes más grandes que una /16 |
 
 En Linux, para que nmap traiga las MAC de todos los equipos: `sudo redportes …` (sin sudo igual las saca de la tabla ARP del sistema).
 
@@ -89,7 +107,7 @@ El historial se guarda en `~/.local/share/redportes/visitas.db` (Linux), `%LOCAL
 
 | Parte | Técnica |
 |---|---|
-| Descubrimiento | `nmap -sn` (si está) + ping a cada dirección + toque TCP a puertos típicos + tabla ARP |
+| Descubrimiento | `nmap -sn` (si está) + barrido de ping propio + toque TCP en redes chicas + tabla ARP |
 | Fabricante | Prefijo de la MAC (IEEE / nmap / lista incorporada); detecta MAC aleatorias |
 | Sistema | TTL del ping, banners de SSH/FTP/Telnet y puertos característicos |
 | Puertos | Conexión TCP completa, sin privilegios; lee el `<title>` de las webs |
@@ -110,7 +128,6 @@ Las reglas de hallazgos están en [`redportes/hallazgos.py`](redportes/hallazgos
 
 ## Ideas para próximas versiones
 
-- Interfaz gráfica / ejecutable para Windows sin instalar Python.
 - Prueba de velocidad opcional.
 - Descubrimiento por mDNS, NetBIOS, LLDP/CDP y SNMP (solo lectura).
 - Varias subredes / VLANs en un mismo informe.

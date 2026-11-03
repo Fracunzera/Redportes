@@ -9,13 +9,37 @@ from datetime import datetime
 from redportes import __version__, clasificacion, descubrimiento, hallazgos, oui, puertos, upnp
 from redportes.modelo import Equipo, a_dict
 from redportes.red import Interfaz, puerta_de_enlace, servidores_dns
+from redportes.icmp import tiempo_estimado
 from redportes.sistema import SO, es_admin, tiene
 
-MAX_HOSTS = 1024
+MAX_HOSTS = 65536  # una /16; más grande requiere confirmación
 
 
 class RedDemasiadoGrande(ValueError):
     pass
+
+
+def resolver_red(nombre_interfaz: str | None = None, red: str | None = None) -> tuple[Interfaz, str]:
+    """Elige interfaz y red a escanear. Lanza ValueError con un mensaje para el usuario."""
+    from redportes.red import listar_interfaces
+
+    todas = listar_interfaces()
+    candidatas = [i for i in todas if i.nombre == nombre_interfaz] if nombre_interfaz else todas
+    if not candidatas:
+        raise ValueError(f"No encontré la interfaz {nombre_interfaz}." if nombre_interfaz
+                         else "No hay ninguna interfaz IPv4 activa.")
+    itf = candidatas[0]
+    if not red:
+        return itf, itf.red
+    try:
+        redip = ipaddress.IPv4Network(red.strip(), strict=False)
+    except ValueError:
+        raise ValueError(f"Red inválida: {red} (ejemplo: 192.168.1.0/24)") from None
+    for i in todas:  # si la red pedida pertenece a otra interfaz, usamos esa
+        if ipaddress.IPv4Address(i.ip) in redip:
+            itf = i
+            break
+    return itf, str(redip)
 
 
 def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: str = "",
@@ -24,8 +48,9 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
     redip = ipaddress.IPv4Network(red, strict=False)
     if redip.num_addresses > MAX_HOSTS and not forzar:
         raise RedDemasiadoGrande(
-            f"La red {redip} tiene {redip.num_addresses} direcciones. Usá --forzar si de verdad "
-            f"querés escanearla entera, o pasá una red más chica con --red.")
+            f"La red {redip} tiene {redip.num_addresses:,} direcciones (el ping solo tardaría unos "
+            f"{tiempo_estimado(redip.num_addresses) / 60:.0f} minutos). Usá --forzar si de verdad "
+            f"querés escanearla entera, o pasá una red más chica con --red.".replace(",", "."))
 
     inicio = datetime.now()
     puerta = puerta_de_enlace()

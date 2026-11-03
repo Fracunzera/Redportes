@@ -24,6 +24,7 @@ from redportes.sistema import ES_MAC, ES_WINDOWS, ejecutar, tiene
 
 _IPV4 = r"(?:\d{1,3}\.){3}\d{1,3}"
 _PUERTOS_TOQUE = (80, 443, 22, 445, 139, 3389, 554, 8080, 53, 8291)
+TOQUE_TCP_MAX = 1024  # direcciones
 
 
 # ---------------------------------------------------------------- ping
@@ -180,24 +181,29 @@ def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None) -> dict
         for e in descubrir_con_nmap(red):
             equipos[e.ip] = e
 
-    hay_ping = tiene("ping")
-    progreso(f"Probando {len(hosts)} direcciones" + (" con ping" if hay_ping else "") + " y TCP…")
+    from redportes import icmp
 
-    def sondear(ip):
-        ttl, lat = hacer_ping(ip) if hay_ping else (None, None)
-        vivo_tcp = False
-        if ttl is None:
-            vivo_tcp = toque_tcp(ip)
-        return ip, ttl, lat, vivo_tcp
+    progreso(f"Ping a {len(hosts)} direcciones…")
+    respuestas = icmp.barrido(hosts, timeout=1.0, progreso=progreso)
+    if respuestas is None and tiene("ping"):
+        # Sin socket ICMP disponible: un proceso `ping` por dirección (lento en redes grandes).
+        with ThreadPoolExecutor(max_workers=128) as ex:
+            respuestas = {ip: r for ip, r in zip(hosts, ex.map(hacer_ping, hosts)) if r[0] is not None}
+    respuestas = respuestas or {}
+    for ip, (ttl, lat) in respuestas.items():
+        e = equipo(ip)
+        e.ttl, e.latencia_ms = ttl, round(lat, 1) if lat is not None else None
+        e.marcar("ping")
 
-    with ThreadPoolExecutor(max_workers=128) as ex:
-        for ip, ttl, lat, vivo_tcp in ex.map(sondear, hosts):
-            if ttl is not None:
-                e = equipo(ip)
-                e.ttl, e.latencia_ms = ttl, lat
-                e.marcar("ping")
-            elif vivo_tcp:
-                equipo(ip).marcar("TCP")
+    # Equipos que bloquean el ping (Windows con firewall, por ejemplo): un toque TCP.
+    # Solo en redes chicas; en las grandes sería demasiado lento.
+    sin_respuesta = [ip for ip in hosts if ip not in equipos]
+    if sin_respuesta and len(hosts) <= TOQUE_TCP_MAX:
+        progreso(f"Toque TCP a {len(sin_respuesta)} direcciones que no respondieron ping…")
+        with ThreadPoolExecutor(max_workers=256) as ex:
+            for ip, vivo in zip(sin_respuesta, ex.map(toque_tcp, sin_respuesta)):
+                if vivo:
+                    equipo(ip).marcar("TCP")
 
     # La tabla ARP trae MACs y equipos que no contestan ping ni TCP.
     for ip, mac in tabla_arp().items():

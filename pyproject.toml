@@ -28,6 +28,9 @@ Repositorio = "https://github.com/Fracunzera/Redportes"
 [project.scripts]
 redportes = "redportes.cli:main"
 
+[project.gui-scripts]
+redportes-gui = "redportes.gui:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
@@ -36,3 +39,6 @@ version = { attr = "redportes.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["redportes*"]
+
+[tool.setuptools.package-data]
+redportes = ["recursos/*"]

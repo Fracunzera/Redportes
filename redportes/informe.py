@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from html import escape
 
@@ -16,6 +17,11 @@ COLORES = {
 }
 NIVEL_COLOR = {"alto": "#dc2626", "medio": "#ea580c", "bajo": "#ca8a04", "info": "#64748b"}
 NIVEL_TEXTO = {"alto": "Alto", "medio": "Medio", "bajo": "Bajo", "info": "Info"}
+
+
+def nombre_archivo(cliente: str, red: str) -> str:
+    base = re.sub(r"[^\w.-]+", "_", cliente or "red").strip("_") or "red"
+    return f"redportes_{base}_{red.split('/')[0]}_{datetime.now():%Y%m%d_%H%M}.html"
 
 
 def _color(tipo: str) -> str:
@@ -44,12 +50,51 @@ def _peor_nivel(eq: dict) -> str:
 
 # ---------------------------------------------------------------- mapa SVG
 
+MAX_NODOS = 96  # con más equipos, el mapa agrupa por /24
+
+
+def _nodos(equipos: list[dict]) -> list[dict]:
+    """Un nodo por equipo, o uno por /24 si son demasiados para dibujarlos."""
+    if len(equipos) <= MAX_NODOS:
+        res = []
+        for e in equipos:
+            puertos = ", ".join(str(p["numero"]) for p in e.get("puertos", []))
+            res.append({
+                "linea1": e["ip"],
+                "linea2": e.get("nombre") or e.get("fabricante") or e.get("tipo") or "",
+                "letra": "★" if e.get("es_este_equipo") else (e.get("tipo") or "?")[0],
+                "tam": 11,
+                "color": _color(e.get("tipo", "")),
+                "borde": NIVEL_COLOR.get(_peor_nivel(e), "#fff"),
+                "tip": f'{e["ip"]} — {e.get("tipo", "")}\n{e.get("fabricante", "")}\n{e.get("mac", "")}'
+                       + (f"\nPuertos: {puertos}" if puertos else ""),
+            })
+        return res
+    grupos: dict[str, list[dict]] = {}
+    for e in equipos:
+        grupos.setdefault(".".join(e["ip"].split(".")[:3]) + ".0/24", []).append(e)
+    res = []
+    for red, lista in grupos.items():
+        niveles = {_peor_nivel(e) for e in lista}
+        peor = next((n for n in ("alto", "medio", "bajo") if n in niveles), "")
+        tipos: dict[str, int] = {}
+        for e in lista:
+            tipos[e.get("tipo") or "?"] = tipos.get(e.get("tipo") or "?", 0) + 1
+        resumen = "\n".join(f"{n} × {t}" for t, n in sorted(tipos.items(), key=lambda x: -x[1])[:6])
+        res.append({"linea1": red, "linea2": f"{len(lista)} equipos",
+                    "letra": str(len(lista)) if len(lista) < 1000 else "+", "tam": 10,
+                    "color": "#334155", "borde": NIVEL_COLOR.get(peor, "#fff"),
+                    "tip": f"{red}: {len(lista)} equipos\n{resumen}"})
+    return res
+
+
 def mapa_svg(r: dict) -> str:
     equipos = r["equipos"]
     puerta = r.get("puerta") or ""
     resto = [e for e in equipos if e["ip"] != puerta]
+    nodos_equipos = _nodos(resto)
     ancho, cols, paso_x, paso_y = 1000, 8, 118, 92
-    filas = max(1, -(-len(resto) // cols))
+    filas = max(1, -(-len(nodos_equipos) // cols))
     alto = 190 + filas * paso_y
     s = [f'<svg viewBox="0 0 {ancho} {alto}" xmlns="http://www.w3.org/2000/svg" '
          f'role="img" aria-label="Mapa de la red" font-family="inherit">']
@@ -98,34 +143,27 @@ def mapa_svg(r: dict) -> str:
     # Bus de la red local y equipos
     bus_y = 140
     if resto:
-        fin_bus = 60 + (min(cols, len(resto)) - 1) * paso_x + 40
+        fin_bus = 60 + (min(cols, len(nodos_equipos)) - 1) * paso_x + 40
         s.append(f'<line x1="{xs[0]:.0f}" y1="{y0 + 20}" x2="{xs[0]:.0f}" y2="{bus_y}" '
                  f'stroke="#2563eb" stroke-width="2"/>')
         s.append(f'<line x1="{xs[0]:.0f}" y1="{bus_y}" x2="{max(fin_bus, xs[0]):.0f}" y2="{bus_y}" '
                  f'stroke="#2563eb" stroke-width="3"/>')
         s.append(f'<text x="{max(fin_bus, xs[0]):.0f}" y="{bus_y - 6}" text-anchor="end" '
                  f'font-size="10" fill="#2563eb">Red {_e(r["red"])}</text>')
-    for i, e in enumerate(resto):
+    for i, n in enumerate(nodos_equipos):
         fila, col = divmod(i, cols)
         x = 100 + col * paso_x
         y = bus_y + 40 + fila * paso_y
         if fila == 0:
             s.append(f'<line x1="{x}" y1="{bus_y}" x2="{x}" y2="{y - 16}" stroke="#cbd5e1" stroke-width="1.5"/>')
-        nivel = _peor_nivel(e)
-        borde = NIVEL_COLOR.get(nivel, "#fff")
-        nombre = e.get("nombre") or e.get("fabricante") or e.get("tipo") or ""
-        puertos = ", ".join(str(p["numero"]) for p in e.get("puertos", []))
-        tip = f'{e["ip"]} — {e.get("tipo","")}\n{e.get("fabricante","")}\n{e.get("mac","")}' \
-              + (f"\nPuertos: {puertos}" if puertos else "")
-        letra = "★" if e.get("es_este_equipo") else (e.get("tipo") or "?")[0]
-        s.append(f'<g transform="translate({x},{y})"><title>{_e(tip)}</title>'
-                 f'<circle r="15" fill="{_color(e.get("tipo",""))}" stroke="{borde}" stroke-width="4"/>'
-                 f'<text text-anchor="middle" y="4" font-size="11" fill="#fff" font-weight="700">'
-                 f'{_e(letra)}</text>'
+        s.append(f'<g transform="translate({x},{y})"><title>{_e(n["tip"])}</title>'
+                 f'<circle r="15" fill="{n["color"]}" stroke="{n["borde"]}" stroke-width="4"/>'
+                 f'<text text-anchor="middle" y="4" font-size="{n["tam"]}" fill="#fff" font-weight="700">'
+                 f'{_e(n["letra"])}</text>'
                  f'<text text-anchor="middle" y="32" font-size="10.5" font-weight="600" fill="#0f172a">'
-                 f'{_e(e["ip"])}</text>'
+                 f'{_e(n["linea1"])}</text>'
                  f'<text text-anchor="middle" y="44" font-size="9" fill="#64748b">'
-                 f'{_e(_corto(nombre, 20))}</text></g>')
+                 f'{_e(_corto(n["linea2"], 20))}</text></g>')
     s.append("</svg>")
     return "".join(s)
 
@@ -175,6 +213,7 @@ def generar(r: dict, cambios: dict | None = None) -> str:
 </section>
 <section><h2>Mapa</h2><div class="mapa">{mapa_svg(r)}</div>
 {_leyenda(r)}
+{'<p class="nota">Hay demasiados equipos para dibujarlos uno por uno: el mapa los agrupa por subred /24.</p>' if len(r['equipos']) > MAX_NODOS + 1 else ''}
 <p class="nota">El borde de cada equipo indica el hallazgo más grave: rojo alto, naranja medio,
 amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
 """]

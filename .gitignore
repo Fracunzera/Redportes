@@ -7,5 +7,3 @@ dist/
 venv/
 .pytest_cache/
 redportes_*.html
-*.json
-!tests/datos/*.json

@@ -138,8 +138,13 @@ def escanear(ips: list[str], puertos: list[int], progreso=lambda m: None) -> dic
         return res
     pares = [(ip, p) for ip in ips for p in puertos]
     progreso(f"Revisando {len(puertos)} puertos en {len(ips)} equipos…")
-    with ThreadPoolExecutor(max_workers=200) as ex:
-        abiertos = [par for par, ok in zip(pares, ex.map(lambda x: puerto_abierto(*x), pares)) if ok]
+    abiertos = []
+    with ThreadPoolExecutor(max_workers=400) as ex:
+        for n, (par, ok) in enumerate(zip(pares, ex.map(lambda x: puerto_abierto(*x), pares)), 1):
+            if ok:
+                abiertos.append(par)
+            if len(pares) > 20000 and n % (len(pares) // 10) == 0:
+                progreso(f"Puertos: {n}/{len(pares)} pruebas, {len(abiertos)} abiertos…")
 
     def detalle(par):
         ip, p = par

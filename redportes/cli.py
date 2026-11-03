@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import ipaddress
 import json
-import re
 import sys
 import webbrowser
-from datetime import datetime
 from pathlib import Path
 
 from redportes import __version__
@@ -25,8 +22,9 @@ def _progreso(msg: str) -> None:
 
 
 def _nombre_archivo(cliente: str, red: str) -> str:
-    base = re.sub(r"[^\w.-]+", "_", cliente or "red").strip("_") or "red"
-    return f"redportes_{base}_{red.split('/')[0]}_{datetime.now():%Y%m%d_%H%M}.html"
+    from redportes.informe import nombre_archivo
+
+    return nombre_archivo(cliente, red)
 
 
 # ---------------------------------------------------------------- comandos
@@ -45,30 +43,12 @@ def cmd_interfaces(_args) -> int:
 def cmd_escanear(args) -> int:
     from redportes import escaneo, informe, visitas
     from redportes.puertos import lista_de_puertos
-    from redportes.red import listar_interfaces
 
-    interfaces = listar_interfaces()
-    if args.interfaz:
-        interfaces = [i for i in interfaces if i.nombre == args.interfaz]
-        if not interfaces:
-            print(f"No encontré la interfaz {args.interfaz}. Mirá `redportes interfaces`.", file=sys.stderr)
-            return 2
-    if not interfaces:
-        print("No hay ninguna interfaz IPv4 activa.", file=sys.stderr)
+    try:
+        itf, red = escaneo.resolver_red(args.interfaz, args.red)
+    except ValueError as e:
+        print(f"{e} Mirá `redportes interfaces`.", file=sys.stderr)
         return 2
-    itf = interfaces[0]
-    if args.red:
-        try:
-            red = str(ipaddress.IPv4Network(args.red, strict=False))
-        except ValueError:
-            print(f"Red inválida: {args.red} (ejemplo: 192.168.1.0/24)", file=sys.stderr)
-            return 2
-        # Si la red pedida es de otra interfaz, la usamos.
-        for i in listar_interfaces():
-            if ipaddress.IPv4Address(i.ip) in ipaddress.IPv4Network(red):
-                itf = i
-    else:
-        red = itf.red
     try:
         lista = lista_de_puertos(args.puertos)
     except ValueError as e:
@@ -194,7 +174,7 @@ def construir_parser() -> argparse.ArgumentParser:
     e.add_argument("--abrir", action="store_true", help="abre el informe en el navegador al terminar")
     e.add_argument("--sin-nmap", action="store_true", help="no usar nmap aunque esté instalado")
     e.add_argument("--no-guardar", action="store_true", help="no guardar la visita en el historial")
-    e.add_argument("--forzar", action="store_true", help=f"permite redes de más de 1024 direcciones")
+    e.add_argument("--forzar", action="store_true", help="permite redes más grandes que una /16")
     e.set_defaults(func=cmd_escanear)
 
     sub.add_parser("interfaces", help="muestra las interfaces y la puerta de enlace").set_defaults(func=cmd_interfaces)
