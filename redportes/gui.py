@@ -201,6 +201,8 @@ class App:
         self.b_guardar.pack(side="left", padx=6)
         ttk.Button(pie, text="Carpeta de informes",
                    command=lambda: abrir(carpeta_informes())).pack(side="left")
+        self.b_oui = ttk.Button(pie, text="Actualizar fabricantes", command=self.actualizar_oui)
+        self.b_oui.pack(side="left", padx=6)
         ttk.Label(pie, text="Usalo solo en redes donde tengas autorización.",
                   foreground="#64748b").pack(side="right")
 
@@ -293,6 +295,10 @@ class App:
             while True:
                 tipo, dato = self.cola.get_nowait()
                 if tipo == "progreso":
+                    self.v_estado.set(dato)
+                    self._log(dato)
+                elif tipo == "oui":
+                    self.b_oui.configure(state="normal")
                     self.v_estado.set(dato)
                     self._log(dato)
                 elif tipo == "fin":
@@ -394,6 +400,26 @@ class App:
             t.insert("end", h.comando, "cmd")
         t.configure(state="normal")  # se deja editable para poder seleccionar y copiar
         t.bind("<Key>", lambda ev: None if (ev.state & 4 and ev.keysym.lower() in ("c", "a")) else "break")
+
+    def actualizar_oui(self):
+        from redportes import oui
+
+        if not messagebox.askyesno(
+                "Actualizar fabricantes",
+                f"Hoy se conocen {oui.cantidad():,} fabricantes.\n\nSe va a bajar la base completa de la "
+                "IEEE (unos 5 MB) desde standards-oui.ieee.org. ¿Continuar?".replace(",", ".")):
+            return
+        self.b_oui.configure(state="disabled")
+        self.v_estado.set("Bajando la base de fabricantes de la IEEE…")
+
+        def trabajo():
+            try:
+                n = oui.actualizar_base()
+                self.cola.put(("oui", f"Base de fabricantes actualizada: {n:,} registros.".replace(",", ".")))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("oui", f"No se pudo bajar la base de fabricantes: {e}"))
+
+        threading.Thread(target=trabajo, daemon=True).start()
 
     def abrir_informe(self):
         if self.ruta_informe:

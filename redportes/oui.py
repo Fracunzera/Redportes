@@ -2,8 +2,9 @@
 
 Orden de búsqueda:
 1. Base completa de la IEEE, si se bajó con `redportes actualizar-oui`.
-2. La base que trae nmap, si está instalado.
-3. Una lista mínima incorporada con fabricantes habituales en redes de pymes.
+2. La base de la IEEE que viene con el instalador de Windows (recursos/oui.csv).
+3. La base que trae nmap, si está instalado.
+4. Una lista mínima incorporada con fabricantes habituales en redes de pymes.
 """
 
 from __future__ import annotations
@@ -77,14 +78,18 @@ def _tabla() -> dict[str, str]:
                     if len(pref) == 6:
                         tabla[pref.upper()] = nombre.strip()
             break
-    ieee = _ruta_ieee()
-    if ieee.exists():
-        with ieee.open(newline="", encoding="utf-8", errors="replace") as f:
-            for fila in csv.DictReader(f):
-                pref = (fila.get("Assignment") or "").upper()
-                if len(pref) == 6:
-                    tabla[pref] = (fila.get("Organization Name") or "").strip()
+    for ieee in (Path(__file__).parent / "recursos" / "oui.csv", _ruta_ieee()):
+        if ieee.exists():
+            with ieee.open(newline="", encoding="utf-8", errors="replace") as f:
+                for fila in csv.DictReader(f):
+                    pref = (fila.get("Assignment") or "").upper()
+                    if len(pref) == 6:
+                        tabla[pref] = (fila.get("Organization Name") or "").strip()
     return tabla
+
+
+def cantidad() -> int:
+    return len(_tabla())
 
 
 def fabricante(mac: str) -> str:
@@ -99,15 +104,16 @@ def fabricante(mac: str) -> str:
     return ""
 
 
-def actualizar_base() -> int:
+def actualizar_base(destino: Path | None = None) -> int:
     """Baja la base de fabricantes de la IEEE. Devuelve la cantidad de registros."""
-    req = urllib.request.Request(URL_IEEE, headers={"User-Agent": "redportes"})
+    req = urllib.request.Request(URL_IEEE, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; redportes; +https://github.com/Fracunzera/Redportes)"})
     with urllib.request.urlopen(req, timeout=60) as r:
         datos = r.read()
     texto = datos.decode("utf-8", errors="replace")
     filas = sum(1 for _ in csv.DictReader(io.StringIO(texto)))
     if filas < 1000:
         raise RuntimeError("La descarga no parece la base de la IEEE.")
-    _ruta_ieee().write_bytes(datos)
+    (destino or _ruta_ieee()).write_bytes(datos)
     _tabla.cache_clear()
     return filas
