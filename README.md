@@ -66,6 +66,7 @@ No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
 - **Qué se ve desde Internet** (con `--internet`): consulta pasiva a [Shodan InternetDB](https://internetdb.shodan.io/) sobre la IP pública: puertos publicados (RDP, cámaras, Winbox…) y vulnerabilidades conocidas. No escanea nada; con CGNAT avisa que esa IP no es de tu red.
 - **Diagnóstico de conexión** (pestaña *Diagnóstico* o `redportes diagnostico`): ping al router y a Internet con pérdida, latencia y jitter, prueba de cada DNS configurado contra uno público y navegación HTTPS real. Dice en castellano si el problema es la red local, el proveedor o el DNS, y se copia con un botón para pegarlo en un chat o ticket.
 - **Este equipo** (pestaña o `redportes equipo`): la configuración de la PC desde la que escaneás. IP, máscara, MAC, si viene por DHCP (y de qué servidor) o es fija, velocidad y dúplex del enlace, MTU, Wi-Fi (red, señal, canal, banda, seguridad), proxy, firewall, archivo hosts, sistema, RAM y disco. Avisa lo que suele dar problemas: cable negociando a 100 Mb/s, señal débil, Wi-Fi abierto o WEP, IP fija, firewall apagado, IP 169.254.
+- **Informe para compartir**: una copia con IPs, MACs y nombres tapados, para publicar capturas o pedir ayuda sin exponer la red.
 - **Salud de la red (0 a 100)** con semáforo y los motivos del puntaje: un número que entiende cualquiera.
 - **Visitas por cliente**: guarda cada escaneo y en la siguiente visita te dice qué equipos son nuevos, cuáles ya no están y qué puertos se abrieron o cerraron.
 - **Informe mensual**: evolución de la salud, equipos nuevos y desaparecidos, problemas resueltos y nuevos, pendientes y un resumen listo para pegar en una nota.
@@ -188,7 +189,7 @@ El historial se guarda en `~/.local/share/redportes/visitas.db` (Linux), `%LOCAL
 
 ## Publicar una versión
 
-1. Subir el número en `redportes/__init__.py`.
+1. Subir el número en `redportes/__init__.py` y anotar los cambios en `CHANGELOG.md` (sección `## [X.Y.Z]`).
 2. En GitHub: *Releases → Draft a new release*, crear el tag `vX.Y.Z` y publicar.
 3. GitHub Actions arma el instalador de Windows y lo adjunta a la release solo (tarda un par de minutos).
 
@@ -203,7 +204,13 @@ python ejemplos/generar_ejemplo.py /tmp/ejemplo.html   # informe con datos de pr
 
 Las reglas de hallazgos están en [`redportes/hallazgos.py`](redportes/hallazgos.py) y la clasificación de equipos en [`redportes/clasificacion.py`](redportes/clasificacion.py): son el mejor lugar para contribuir.
 
+## Novedades
+
+Mirá el [registro de cambios](CHANGELOG.md). La app avisa sola cuando hay una versión nueva.
+
 ## Ideas para próximas versiones
+
+- App para Android.
 
 - Prueba de velocidad opcional.
 - Descubrimiento por mDNS, NetBIOS, LLDP/CDP y SNMP (solo lectura).

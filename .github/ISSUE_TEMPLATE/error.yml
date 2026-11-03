@@ -1,0 +1,35 @@
+name: Reportar un error
+description: Algo no funciona como debería
+labels: ["error"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Gracias por avisar! Antes de adjuntar capturas del informe, usá **«Informe para compartir»** para tapar las IPs y MACs de tu red.
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Redportes
+      description: Aparece en la barra de título de la ventana o con `redportes --version`.
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema
+      options: ["Windows (instalador)", "Windows (portable)", "Linux", "macOS"]
+    validations:
+      required: true
+  - type: textarea
+    id: que_paso
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué hizo en cambio.
+    validations:
+      required: true
+  - type: textarea
+    id: capturas
+    attributes:
+      label: Capturas o mensaje de error
+      description: Si la ventana muestra un error, copialo de la pestaña «Registro».

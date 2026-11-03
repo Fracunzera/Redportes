@@ -93,6 +93,10 @@ def cmd_escanear(args) -> int:
     destino = Path(args.salida) if args.salida else carpeta / _nombre_archivo(r["cliente"], r["red"])
     destino.write_text(informe.generar(r, cambios), encoding="utf-8")
     print(f"\nInforme: {destino.resolve()}")
+    if args.compartir:
+        comp = destino.with_name(destino.stem + "_compartir.html")
+        comp.write_text(informe.generar_compartible(r, cambios), encoding="utf-8")
+        print(f"Para compartir (datos tapados): {comp.resolve()}")
     if args.json:
         Path(args.json).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"JSON:    {Path(args.json).resolve()}")
@@ -155,9 +159,10 @@ def cmd_informe(args) -> int:
         return 2
     previo = visitas.anterior(r["cliente"], r["red"], antes_de=args.id)
     cambios = visitas.comparar(previo, r) if previo else None
-    destino = Path(args.salida or _nombre_archivo(r["cliente"], r["red"]))
-    destino.write_text(informe.generar(r, cambios), encoding="utf-8")
-    print(f"Informe: {destino.resolve()}")
+    destino = Path(args.salida or informe.nombre_archivo(r["cliente"], r["red"], args.compartir))
+    contenido = informe.generar_compartible(r, cambios) if args.compartir else informe.generar(r, cambios)
+    destino.write_text(contenido, encoding="utf-8")
+    print(f"Informe{' para compartir' if args.compartir else ''}: {destino.resolve()}")
     if args.abrir:
         webbrowser.open(destino.resolve().as_uri())
     return 0
@@ -309,6 +314,8 @@ def construir_parser() -> argparse.ArgumentParser:
     e.add_argument("--forzar", action="store_true", help="permite redes más grandes que una /16")
     e.add_argument("--avisar", action="store_true", help="avisa por Telegram si hay novedades")
     e.add_argument("--carpeta", help="carpeta donde guardar el informe (por defecto la actual)")
+    e.add_argument("--compartir", action="store_true",
+                   help="genera además una copia con IPs, MACs y nombres tapados")
     e.set_defaults(func=cmd_escanear)
 
     iv = sub.add_parser("inventario", help="exporta el inventario de equipos a CSV (Excel)")
@@ -351,6 +358,7 @@ def construir_parser() -> argparse.ArgumentParser:
     inf.add_argument("id", type=int)
     inf.add_argument("-o", "--salida")
     inf.add_argument("--abrir", action="store_true")
+    inf.add_argument("--compartir", action="store_true", help="con IPs, MACs y nombres tapados")
     inf.set_defaults(func=cmd_informe)
 
     sub.add_parser("diagnostico", help="prueba rápida de conexión: router, Internet, DNS y navegación"

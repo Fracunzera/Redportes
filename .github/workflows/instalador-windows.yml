@@ -115,10 +115,23 @@ jobs:
           Copy-Item (Get-Item dist\Redportes-*-instalador.exe) dist\release\Redportes-Windows-instalador.exe
           Copy-Item (Get-Item dist\Redportes-*-portable.zip) dist\release\Redportes-Windows-portable.zip
 
+      - name: Notas de la versión (desde CHANGELOG.md)
+        if: github.event_name == 'release'
+        shell: python
+        run: |
+          import re
+          v = "${{ steps.v.outputs.version }}"
+          texto = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(rf"^## \[{re.escape(v)}\][^\n]*\n(.*?)(?=^## \[|\Z)", texto, re.S | re.M)
+          cuerpo = (m.group(1).strip() if m else "") + "\n\n**Descargas:** `Redportes-Windows-instalador.exe` (instalador) o `Redportes-Windows-portable.zip` (sin instalar). Si Windows muestra «protegió su PC», tocá *Más información* → *Ejecutar de todas formas*."
+          open("notas.md", "w", encoding="utf-8").write(cuerpo)
+
       - name: Publicar en Releases
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
+          body_path: notas.md
+          append_body: true
           files: |
             dist/release/Redportes-Windows-instalador.exe
             dist/release/Redportes-Windows-portable.zip

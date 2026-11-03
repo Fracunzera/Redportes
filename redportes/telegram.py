@@ -14,7 +14,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from redportes.sistema import carpeta_datos
 
 API = "https://api.telegram.org"
 
@@ -26,7 +25,9 @@ class ErrorTelegram(RuntimeError):
 # ---------------------------------------------------------------- configuración
 
 def _ruta():
-    return carpeta_datos() / "config.json"
+    from redportes import config
+
+    return config.ruta()
 
 
 def leer_config() -> dict:

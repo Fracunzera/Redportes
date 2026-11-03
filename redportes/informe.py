@@ -19,9 +19,20 @@ NIVEL_COLOR = {"alto": "#dc2626", "medio": "#ea580c", "bajo": "#ca8a04", "info":
 NIVEL_TEXTO = {"alto": "Alto", "medio": "Medio", "bajo": "Bajo", "info": "Info"}
 
 
-def nombre_archivo(cliente: str, red: str) -> str:
+def nombre_archivo(cliente: str, red: str, compartir: bool = False) -> str:
     base = re.sub(r"[^\w.-]+", "_", cliente or "red").strip("_") or "red"
-    return f"redportes_{base}_{red.split('/')[0]}_{datetime.now():%Y%m%d_%H%M}.html"
+    sufijo = "_compartir" if compartir else ""
+    return f"redportes_{base}_{red.split('/')[0]}_{datetime.now():%Y%m%d_%H%M}{sufijo}.html"
+
+
+def generar_compartible(r: dict, cambios: dict | None = None) -> str:
+    """Informe con IPs, MACs y nombres tapados, para publicar o pedir ayuda."""
+    from redportes.compartir import anonimizar, anonimizar_cambios
+
+    html = generar(anonimizar(r), anonimizar_cambios(cambios) if cambios else None)
+    if r.get("cliente"):
+        html = html.replace(_e(r["cliente"]), "Red de ejemplo")
+    return html
 
 
 def _color(tipo: str) -> str:
@@ -239,6 +250,7 @@ const s=getSelection();s.removeAllRanges();s.addRange(r)}})}}</script></head><bo
   · {_e(r['sistema'])} · {r['duracion_s']} s</div></div>
   <button class="no-print" onclick="window.print()">Guardar como PDF</button>
 </header>
+{'<p class="compartible">Versión para compartir: las IPs, MACs y nombres están tapados.</p>' if r.get('compartible') else ''}
 {_bloque_salud(r)}
 <section class="tarjetas">
   {_tarjeta(len(r['equipos']), 'equipos encontrados')}
@@ -403,6 +415,7 @@ h2{font-size:18px;margin:30px 0 10px;border-bottom:1px solid #e2e8f0;padding-bot
 h3{font-size:14px;margin:14px 0 4px}
 .meta,.gris,.nota{color:#64748b}.nota{font-size:13px}
 button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+.compartible{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;margin:16px 0 0;font-size:14px}
 .salud{display:flex;gap:18px;align-items:center;margin-top:20px;border:1px solid #e2e8f0;
   border-radius:10px;padding:14px 18px}
 .nota-salud{width:92px;height:92px;border-radius:50%;border:7px solid;display:flex;align-items:baseline;

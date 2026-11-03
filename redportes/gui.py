@@ -85,6 +85,17 @@ class App:
         estilo.configure("Treeview", rowheight=24)
         estilo.configure("Accion.TButton", font=("TkDefaultFont", 10, "bold"), padding=(16, 6))
 
+        self.banner = tk.Frame(raiz, background="#fef3c7")
+        self.l_banner = tk.Label(self.banner, background="#fef3c7", foreground="#713f12",
+                                 font=("TkDefaultFont", 10, "bold"))
+        self.l_banner.pack(side="left", padx=12, pady=6)
+        tk.Button(self.banner, text="✕", relief="flat", background="#fef3c7", cursor="hand2",
+                  command=self.banner.pack_forget).pack(side="right", padx=6)
+        self.b_notas = ttk.Button(self.banner, text="Qué hay de nuevo")
+        self.b_notas.pack(side="right", padx=4, pady=4)
+        self.b_bajar = ttk.Button(self.banner, text="Descargar")
+        self.b_bajar.pack(side="right", padx=4, pady=4)
+
         self._armar_formulario()
         self._armar_pestanas()
         self._armar_pie()
@@ -92,7 +103,7 @@ class App:
         self._cargar_visitas()
         self._actualizar_cb_avisar()
         raiz.after(100, self._leer_cola)
-        raiz.after(800, self._ofrecer_oui)
+        raiz.after(800, self._inicio)
 
     # ------------------------------------------------------------ armado
 
@@ -260,6 +271,9 @@ class App:
         self.b_guardar = ttk.Button(pie, text="Guardar informe como…", command=self.guardar_como,
                                     state="disabled")
         self.b_guardar.pack(side="left", padx=6)
+        self.b_compartir = ttk.Button(pie, text="Informe para compartir", command=self.informe_compartir,
+                                      state="disabled")
+        self.b_compartir.pack(side="left")
         ttk.Button(pie, text="Carpeta de informes",
                    command=lambda: abrir(carpeta_informes())).pack(side="left")
         ttk.Button(pie, text="Inventario (Excel)", command=self.exportar_inventario).pack(side="left", padx=6)
@@ -372,6 +386,8 @@ class App:
                 if tipo == "progreso":
                     self.v_estado.set(dato)
                     self._log(dato)
+                elif tipo == "nueva":
+                    self._mostrar_nueva(dato)
                 elif tipo == "local":
                     self._mostrar_equipo_local(dato)
                 elif tipo == "diag":
@@ -399,6 +415,8 @@ class App:
         self.resultado, self.ruta_informe = r, ruta
         self.b_informe.configure(state="normal")
         self.b_guardar.configure(state="normal")
+        self.b_compartir.configure(state="normal")
+        self.cambios = cambios
 
         peor = {}
         hall = todos_los_hallazgos(r)
@@ -680,6 +698,47 @@ class App:
             self.raiz.clipboard_append(diagnostico.como_texto(self.diag))
             self.v_estado.set("Resultado copiado: pegalo en WhatsApp, Telegram o en el ticket.")
 
+    # ------------------------------------------------------------ al abrir
+
+    def _inicio(self):
+        self._ofrecer_oui()
+        self._preguntar_actualizaciones()
+
+    def _preguntar_actualizaciones(self):
+        from redportes import config
+
+        cfg = config.leer()
+        act = cfg.setdefault("actualizaciones", {})
+        if "activado" not in act:
+            act["activado"] = messagebox.askyesno(
+                "Redportes", "¿Querés que Redportes te avise cuando salga una versión nueva?\n\n"
+                "Al abrirse consulta GitHub como mucho una vez por día. No envía ningún dato de tus redes.")
+            config.guardar(cfg)
+        if not act["activado"]:
+            return
+
+        def trabajo():
+            from redportes import actualizaciones
+
+            c = config.leer()
+            info = actualizaciones.hay_nueva(c)
+            config.guardar(c)
+            if info:
+                self.cola.put(("nueva", info))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_nueva(self, info: dict):
+        from redportes import actualizaciones
+        from redportes.sistema import es_portable
+
+        url = actualizaciones.DESCARGA_PORTABLE if es_portable() else actualizaciones.DESCARGA_INSTALADOR
+        self.l_banner.configure(text=f"Hay una versión nueva de Redportes: {info['version']} "
+                                     f"(tenés la {__version__}).")
+        self.b_bajar.configure(command=lambda: webbrowser.open(url))
+        self.b_notas.configure(command=lambda: webbrowser.open(info.get("url") or actualizaciones.PAGINA))
+        self.banner.pack(fill="x", before=self.raiz.winfo_children()[1])
+
     def _ofrecer_oui(self):
         """La primera vez, si no hay base completa de fabricantes, ofrece bajarla."""
         from redportes import oui
@@ -717,6 +776,15 @@ class App:
     def abrir_informe(self):
         if self.ruta_informe:
             abrir(self.ruta_informe)
+
+    def informe_compartir(self):
+        if not self.resultado:
+            return
+        r = self.resultado
+        ruta = carpeta_informes() / informe.nombre_archivo(r["cliente"], r["red"], compartir=True)
+        ruta.write_text(informe.generar_compartible(r, getattr(self, "cambios", None)), encoding="utf-8")
+        self.v_estado.set("Informe para compartir listo: IPs, MACs y nombres tapados.")
+        abrir(ruta)
 
     def guardar_como(self):
         if not self.ruta_informe:

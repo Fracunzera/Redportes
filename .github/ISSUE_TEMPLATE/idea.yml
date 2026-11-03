@@ -1,0 +1,16 @@
+name: Proponer una idea
+description: Algo que te gustaría que Redportes haga
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Qué te gustaría que haga
+      description: Contá el problema que tenés en el trabajo de todos los días; la solución la pensamos juntos.
+    validations:
+      required: true
+  - type: textarea
+    id: ejemplo
+    attributes:
+      label: Un ejemplo
+      description: Una red, un equipo o una situación donde lo usarías.
