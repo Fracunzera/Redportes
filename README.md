@@ -42,6 +42,8 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 
 Bajá el instalador `Redportes-x.y.z-instalador.exe` de la sección [Releases](https://github.com/Fracunzera/Redportes/releases/latest) y ejecutalo. No pide permisos de administrador ni necesita Python. Queda en el menú Inicio como **Redportes**.
 
+**Versión portable:** en la misma release está `Redportes-x.y.z-portable.zip`. Descomprimilo donde quieras (por ejemplo en un pendrive) y abrí `Redportes.exe`. No instala nada y guarda el historial, la configuración y los informes dentro de su propia carpeta: ideal para llevar de cliente en cliente.
+
 > Como el instalador no está firmado digitalmente, Windows puede mostrar *«Windows protegió su PC»*: tocá **Más información → Ejecutar de todas formas**.
 
 Los informes se guardan en `Documentos\Redportes`.

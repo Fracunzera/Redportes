@@ -122,3 +122,16 @@ def test_programar_argumentos():
     assert programar.nombre_tarea("Ferretería X", "192.168.1.0/24") == "Redportes - Ferretería X"
     with pytest.raises(ValueError):
         programar._validar_hora("25:00")
+
+
+def test_portable(monkeypatch, tmp_path):
+    import sys
+
+    from redportes import sistema
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "Redportes.exe"))
+    assert not sistema.es_portable()
+    (tmp_path / "portable.txt").write_text("x")
+    assert sistema.es_portable()
+    assert sistema.carpeta_datos() == tmp_path / "datos" and (tmp_path / "datos").is_dir()

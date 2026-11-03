@@ -83,13 +83,33 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersion=${{ steps.v.outputs.version }}" empaquetado\redportes.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC falló" }
 
+      - name: Versión portable (zip)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.v.outputs.version }}"
+          $dir = "dist\portable\Redportes-$v-portable"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item -Recurse dist\Redportes\* $dir
+          Set-Content "$dir\portable.txt" "Redportes portable: el historial, la configuracion y los informes se guardan en esta carpeta (datos\ e Informes\). Abri Redportes.exe."
+          Compress-Archive -Path $dir -DestinationPath "dist\Redportes-$v-portable.zip"
+          # Probar que la portable arranca y guarda en su carpeta
+          $p = Start-Process "$dir\Redportes.exe" -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "La portable se cerró sola" }
+          Stop-Process -Id $p.Id
+          if (-not (Test-Path "$dir\datos")) { throw "La portable no creó su carpeta de datos" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: Redportes-instalador
-          path: dist/Redportes-*-instalador.exe
+          path: |
+            dist/Redportes-*-instalador.exe
+            dist/Redportes-*-portable.zip
 
       - name: Publicar en Releases
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Redportes-*-instalador.exe
+          files: |
+            dist/Redportes-*-instalador.exe
+            dist/Redportes-*-portable.zip

@@ -31,6 +31,12 @@ RECURSOS = Path(__file__).parent / "recursos"
 
 
 def carpeta_informes() -> Path:
+    from redportes.sistema import carpeta_programa, es_portable
+
+    if es_portable():
+        d = carpeta_programa() / "Informes"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
     docs = Path.home() / "Documents"
     if not docs.exists():
         docs = Path.home() / "Documentos" if (Path.home() / "Documentos").exists() else Path.home()
@@ -59,7 +65,9 @@ class App:
         self.hallazgos_vista: dict[str, object] = {}
         self.interfaces = []
 
-        raiz.title(f"Redportes {__version__}")
+        from redportes.sistema import es_portable
+
+        raiz.title(f"Redportes {__version__}" + (" (portable)" if es_portable() else ""))
         raiz.geometry("1060x700")
         raiz.minsize(860, 560)
         try:
@@ -772,6 +780,12 @@ class Automatizar:
         # --- Programación
         g = ttk.LabelFrame(v, text=" 2. Escaneo automático diario ", padding=12)
         g.pack(fill="both", expand=True, padx=12, pady=6)
+        from redportes.sistema import es_portable
+
+        if es_portable():
+            ttk.Label(g, text="Versión portable: la tarea apunta a esta carpeta. Si la movés o el pendrive "
+                              "cambia de letra, volvé a programarla.", foreground="#a16207",
+                      wraplength=560).pack(anchor="w", pady=(0, 6))
         cliente = app.v_cliente.get().strip() or "(sin nombre)"
         ttk.Label(g, text=f"Cliente: {cliente}    Red: {app.v_red.get()}\n"
                           "Se usan los datos cargados en la ventana principal. Si hay novedades "

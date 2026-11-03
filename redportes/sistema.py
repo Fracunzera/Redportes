@@ -6,6 +6,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 SO = platform.system()  # "Linux", "Windows", "Darwin"
@@ -52,8 +53,26 @@ def es_admin() -> bool:
     return hasattr(os, "geteuid") and os.geteuid() == 0
 
 
+def carpeta_programa() -> Path:
+    """Carpeta del ejecutable (versión empaquetada) o del paquete (instalado con pip)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def es_portable() -> bool:
+    """Versión portable: hay un archivo «portable.txt» al lado del ejecutable (o REDPORTES_PORTABLE=1)."""
+    if os.environ.get("REDPORTES_PORTABLE") == "1":
+        return True
+    return getattr(sys, "frozen", False) and (carpeta_programa() / "portable.txt").exists()
+
+
 def carpeta_datos() -> Path:
-    """Carpeta donde se guardan visitas y la base de fabricantes."""
+    """Carpeta donde se guardan visitas, configuración y la base de fabricantes."""
+    if es_portable():
+        d = carpeta_programa() / "datos"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
     if ES_WINDOWS:
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     elif ES_MAC:
