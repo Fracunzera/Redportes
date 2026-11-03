@@ -254,6 +254,15 @@ def cmd_programar(args) -> int:
         return 1
 
 
+def cmd_diagnostico(_args) -> int:
+    from redportes import diagnostico
+
+    d = diagnostico.ejecutar(_progreso)
+    print()
+    print(diagnostico.como_texto(d))
+    return 0 if all(p["estado"] != "falla" for p in d["pruebas"]) else 1
+
+
 def cmd_actualizar_oui(_args) -> int:
     from redportes import oui
 
@@ -337,6 +346,9 @@ def construir_parser() -> argparse.ArgumentParser:
     inf.add_argument("--abrir", action="store_true")
     inf.set_defaults(func=cmd_informe)
 
+    sub.add_parser("diagnostico", help="prueba rápida de conexión: router, Internet, DNS y navegación"
+                   ).set_defaults(func=cmd_diagnostico)
+
     sub.add_parser("actualizar-oui", help="baja la base completa de fabricantes de la IEEE"
                    ).set_defaults(func=cmd_actualizar_oui)
     return p
@@ -346,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = construir_parser()
     comandos = {"escanear", "interfaces", "visitas", "informe", "actualizar-oui", "inventario",
-                "mensual", "telegram", "programar"}
+                "mensual", "telegram", "programar", "diagnostico"}
     if not argv or (argv[0] not in comandos and argv[0] not in ("-h", "--help", "--version")):
         argv = ["escanear"] + argv
     args = parser.parse_args(argv)

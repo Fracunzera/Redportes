@@ -111,7 +111,7 @@ def _barrido_socket(ips, timeout, tasa, progreso):
                 progreso(f"Ping: {n + 1}/{len(ips)} direcciones, {len(res)} responden…")
                 siguiente_aviso += 0.1
         fin = time.monotonic() + timeout
-        while time.monotonic() < fin:
+        while time.monotonic() < fin and len(res) < len(pendientes):
             r, _, _ = select.select([s], [], [], max(0.0, fin - time.monotonic()))
             if r:
                 recibir()

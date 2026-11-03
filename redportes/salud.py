@@ -34,6 +34,19 @@ def calcular(r: dict) -> dict:
         puntaje -= 3
         motivos.append("doble NAT (−3)")
 
+    diag = r.get("diagnostico") or {}
+    if diag:
+        problemas = 0
+        for pr in diag.get("pruebas", []):
+            if pr["nombre"].startswith(("DNS configurado", "Navegación")) and pr["estado"] == "falla":
+                problemas += 10
+            elif pr["nombre"].startswith("Ping a Internet") and pr["estado"] == "aviso":
+                problemas += 5
+        if problemas:
+            menos = min(problemas, 20)
+            puntaje -= menos
+            motivos.append(f"problemas de conexión (−{menos})")
+
     if any(h.nivel == "alto" for h in hall):
         puntaje = min(puntaje, 74)  # con un problema grave, la red nunca figura como "Buena"
     puntaje = max(0, puntaje)

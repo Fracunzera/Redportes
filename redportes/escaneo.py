@@ -102,6 +102,12 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         from redportes import internet
 
         salida = internet.revisar(puerta, cgnat_wan=datos_wan.get("tipo") == "cgnat")
+        progreso("Probando la conexión (ping, DNS, navegación)…")
+        from redportes import diagnostico
+
+        diag = diagnostico.ejecutar()
+    else:
+        diag = None
 
     from redportes.internet import describir_dns
 
@@ -116,6 +122,7 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         "puerta": puerta,
         "dns": describir_dns(servidores_dns(), puerta),
         "wan": datos_wan,
+        "diagnostico": diag,
         "sistema": SO,
         "admin": es_admin(),
         "nmap": usar_nmap and tiene("nmap"),

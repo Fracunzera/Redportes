@@ -275,6 +275,15 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
     else:
         partes.append('<p class="nota">No se analizó (se activa con <code>--internet</code>, '
                       'porque implica tráfico hacia afuera).</p>')
+    dg = r.get("diagnostico")
+    if dg:
+        color = {"ok": "#16a34a", "aviso": "#ca8a04", "falla": "#dc2626", "info": "#64748b"}
+        filas = "".join(
+            f'<tr><td><span class="punto" style="background:{color[p["estado"]]}"></span>{_e(p["nombre"])}</td>'
+            f'<td>{_e(p["resultado"])}</td></tr>' for p in dg["pruebas"])
+        partes.append('<h3>Diagnóstico de conexión</h3><div class="tabla"><table><tbody>' + filas
+                      + "</tbody></table></div><ul>"
+                      + "".join(f"<li>{_e(c)}</li>" for c in dg["conclusiones"]) + "</ul>")
     if r.get("dns"):
         partes.append("<p>DNS configurados: " + ", ".join(
             f'<b>{_e(d["ip"])}</b> <span class="gris">({_e(d["quien"])})</span>' for d in r["dns"]) + "</p>")
@@ -395,6 +404,7 @@ button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14p
 .cmd pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 0;
   font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,Consolas,monospace}
 .copiar{background:#e2e8f0;color:#0f172a;padding:2px 8px;font-size:11px;border-radius:4px}
+.punto{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
 .chip{background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:600}
 td.lat{white-space:nowrap}
 table{border-collapse:collapse;width:100%;font-size:13px}

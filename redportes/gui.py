@@ -144,7 +144,7 @@ class App:
         t = ttk.Treeview(marco, columns=list(columnas), show="headings", selectmode="browse")
         for col, ancho in columnas.items():
             t.heading(col, text=col)
-            t.column(col, width=ancho, stretch=col in ("Fabricante", "Puertos", "Tema", "Detalle"))
+            t.column(col, width=ancho, stretch=col in ("Fabricante", "Puertos", "Tema", "Detalle", "Resultado"))
         sb = ttk.Scrollbar(marco, orient="vertical", command=t.yview)
         t.configure(yscrollcommand=sb.set)
         t.pack(side="left", fill="both", expand=True)
@@ -182,6 +182,26 @@ class App:
         self.txt_internet = tk.Text(p3, wrap="word", relief="flat", padx=8, pady=6)
         self.txt_internet.pack(fill="both", expand=True)
         self.nb.add(p3, text="Internet")
+
+        p6 = ttk.Frame(self.nb, padding=6)
+        barra = ttk.Frame(p6)
+        barra.pack(fill="x", pady=(0, 6))
+        self.b_diag = ttk.Button(barra, text="Probar conexión", style="Accion.TButton",
+                                 command=self.diagnosticar)
+        self.b_diag.pack(side="left")
+        self.b_copiar_diag = ttk.Button(barra, text="Copiar resultado", command=self.copiar_diagnostico,
+                                        state="disabled")
+        self.b_copiar_diag.pack(side="left", padx=6)
+        ttk.Label(barra, text="Ping al router y a Internet, DNS y navegación. Tarda unos 15 segundos.",
+                  foreground="#64748b").pack(side="left", padx=8)
+        self.t_diag = self._tabla(p6, {"Prueba": 280, "Resultado": 560})
+        for est, color in (("ok", "#dcfce7"), ("aviso", "#fef9c3"), ("falla", "#fde2e2")):
+            self.t_diag.tag_configure(est, background=color)
+        self.txt_diag = tk.Text(p6, height=6, wrap="word", relief="flat", padx=8, pady=6,
+                                background="#f8fafc", font="TkDefaultFont")
+        self.txt_diag.pack(fill="x", pady=(6, 0))
+        self.diag: dict | None = None
+        self.nb.add(p6, text="Diagnóstico")
 
         p4 = ttk.Frame(self.nb, padding=6)
         self.t_visitas = self._tabla(p4, {"N.º": 50, "Fecha": 160, "Cliente": 260, "Red": 160,
@@ -320,6 +340,8 @@ class App:
                 if tipo == "progreso":
                     self.v_estado.set(dato)
                     self._log(dato)
+                elif tipo == "diag":
+                    self._mostrar_diagnostico(dato)
                 elif tipo == "oui":
                     self.b_oui.configure(state="normal")
                     self.v_estado.set(dato)
@@ -484,6 +506,54 @@ class App:
 
     def abrir_automatizar(self):
         Automatizar(self)
+
+    # ------------------------------------------------------------ diagnóstico
+
+    def diagnosticar(self):
+        from redportes import diagnostico
+
+        self.b_diag.configure(state="disabled")
+        self.t_diag.delete(*self.t_diag.get_children())
+        self.txt_diag.delete("1.0", "end")
+        self.txt_diag.insert("end", "Probando… (unos 15 segundos)")
+        self.barra.start(12)
+
+        def trabajo():
+            try:
+                self.cola.put(("diag", diagnostico.ejecutar()))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("diag", {"error": str(e)}))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_diagnostico(self, d: dict):
+        from redportes import diagnostico
+
+        self.barra.stop()
+        self.barra["value"] = 0
+        self.b_diag.configure(state="normal")
+        self.txt_diag.delete("1.0", "end")
+        if "error" in d:
+            self.txt_diag.insert("end", f"No se pudo hacer el diagnóstico: {d['error']}")
+            return
+        self.diag = d
+        for p in d["pruebas"]:
+            self.t_diag.insert("", "end", values=(f"{diagnostico.ICONO[p['estado']]} {p['nombre']}",
+                                                  p["resultado"]), tags=(p["estado"],))
+        self.txt_diag.insert("end", "\n".join(f"• {c}" for c in d["conclusiones"]))
+        self.b_copiar_diag.configure(state="normal")
+        fallas = sum(1 for p in d["pruebas"] if p["estado"] == "falla")
+        avisos = sum(1 for p in d["pruebas"] if p["estado"] == "aviso")
+        self.v_estado.set(f"Diagnóstico listo: {fallas} fallas, {avisos} avisos." if fallas or avisos
+                          else "Diagnóstico listo: todo bien.")
+
+    def copiar_diagnostico(self):
+        from redportes import diagnostico
+
+        if self.diag:
+            self.raiz.clipboard_clear()
+            self.raiz.clipboard_append(diagnostico.como_texto(self.diag))
+            self.v_estado.set("Resultado copiado: pegalo en WhatsApp, Telegram o en el ticket.")
 
     def _ofrecer_oui(self):
         """La primera vez, si no hay base completa de fabricantes, ofrece bajarla."""
