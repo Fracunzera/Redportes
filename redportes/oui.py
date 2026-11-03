@@ -104,16 +104,58 @@ def fabricante(mac: str) -> str:
     return ""
 
 
+URL_WIRESHARK = "https://www.wireshark.org/download/automated/data/manuf"
+_UA = "Mozilla/5.0 (compatible; redportes; +https://github.com/Fracunzera/Redportes)"
+
+
+def _bajar(url: str, timeout: float) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def parsear_manuf(texto: str) -> list[tuple[str, str]]:
+    """Formato de Wireshark: 'XX:XX:XX<TAB>Corto<TAB>Nombre largo'. Solo prefijos de 24 bits."""
+    res = []
+    for linea in texto.splitlines():
+        if not linea or linea.startswith("#"):
+            continue
+        partes = linea.split("\t")
+        pref = partes[0].strip()
+        if "/" in pref or len(partes) < 2:
+            continue
+        pref = pref.replace(":", "").replace("-", "").upper()
+        if len(pref) == 6:
+            res.append((pref, (partes[2] if len(partes) > 2 else partes[1]).strip()))
+    return res
+
+
 def actualizar_base(destino: Path | None = None) -> int:
-    """Baja la base de fabricantes de la IEEE. Devuelve la cantidad de registros."""
-    req = urllib.request.Request(URL_IEEE, headers={
-        "User-Agent": "Mozilla/5.0 (compatible; redportes; +https://github.com/Fracunzera/Redportes)"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        datos = r.read()
-    texto = datos.decode("utf-8", errors="replace")
-    filas = sum(1 for _ in csv.DictReader(io.StringIO(texto)))
-    if filas < 1000:
-        raise RuntimeError("La descarga no parece la base de la IEEE.")
-    (destino or _ruta_ieee()).write_bytes(datos)
+    """Baja la base de fabricantes (IEEE; si no responde, la de Wireshark).
+
+    Devuelve la cantidad de registros guardados.
+    """
+    errores = []
+    filas: list[tuple[str, str]] = []
+    try:
+        texto = _bajar(URL_IEEE, 40)
+        filas = [((f.get("Assignment") or "").upper(), (f.get("Organization Name") or "").strip())
+                 for f in csv.DictReader(io.StringIO(texto))]
+    except Exception as e:  # noqa: BLE001
+        errores.append(f"IEEE: {e}")
+    if len(filas) < 1000:
+        try:
+            filas = parsear_manuf(_bajar(URL_WIRESHARK, 40))
+        except Exception as e:  # noqa: BLE001
+            errores.append(f"Wireshark: {e}")
+    if len(filas) < 1000:
+        raise RuntimeError("No se pudo bajar la base de fabricantes. " + " / ".join(errores))
+    salida = io.StringIO()
+    w = csv.writer(salida)
+    w.writerow(["Registry", "Assignment", "Organization Name", "Organization Address"])
+    for pref, nombre in filas:
+        if len(pref) == 6:
+            w.writerow(["MA-L", pref, nombre, ""])
+    (destino or _ruta_ieee()).write_text(salida.getvalue(), encoding="utf-8")
     _tabla.cache_clear()
-    return filas
+    return len(filas)

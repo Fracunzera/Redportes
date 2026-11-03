@@ -83,6 +83,7 @@ class App:
         self._cargar_interfaces()
         self._cargar_visitas()
         raiz.after(100, self._leer_cola)
+        raiz.after(800, self._ofrecer_oui)
 
     # ------------------------------------------------------------ armado
 
@@ -401,13 +402,27 @@ class App:
         t.configure(state="normal")  # se deja editable para poder seleccionar y copiar
         t.bind("<Key>", lambda ev: None if (ev.state & 4 and ev.keysym.lower() in ("c", "a")) else "break")
 
-    def actualizar_oui(self):
+    def _ofrecer_oui(self):
+        """La primera vez, si no hay base completa de fabricantes, ofrece bajarla."""
+        from redportes import oui
+        from redportes.sistema import carpeta_datos
+
+        marca = carpeta_datos() / "oui_ofrecido"
+        if oui.cantidad() >= 1000 or marca.exists():
+            return
+        marca.write_text("1")
+        self.actualizar_oui(primera_vez=True)
+
+    def actualizar_oui(self, primera_vez: bool = False):
         from redportes import oui
 
+        intro = ("Para mostrar la marca de cada equipo conviene tener la base completa de "
+                 "fabricantes.\n\n") if primera_vez else ""
         if not messagebox.askyesno(
                 "Actualizar fabricantes",
-                f"Hoy se conocen {oui.cantidad():,} fabricantes.\n\nSe va a bajar la base completa de la "
-                "IEEE (unos 5 MB) desde standards-oui.ieee.org. ¿Continuar?".replace(",", ".")):
+                intro + f"Hoy se conocen {oui.cantidad():,} fabricantes. ".replace(",", ".")
+                + "Se va a bajar la base completa (unos 5 MB) de la IEEE o, si no responde, "
+                "de Wireshark. ¿Continuar?"):
             return
         self.b_oui.configure(state="disabled")
         self.v_estado.set("Bajando la base de fabricantes de la IEEE…")

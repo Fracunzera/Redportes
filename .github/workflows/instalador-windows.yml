@@ -19,7 +19,9 @@ jobs:
           python-version: "3.12"
 
       - name: Base de fabricantes (IEEE) para incluir en el instalador
-        run: python -c "from pathlib import Path; from redportes import oui; print(oui.actualizar_base(Path('redportes/recursos/oui.csv')), 'fabricantes')"
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -c "from pathlib import Path; from redportes import oui; oui.URL_WIRESHARK = ''; print(oui.actualizar_base(Path('redportes/recursos/oui.csv')), 'fabricantes')"
 
       - name: Dependencias
         run: pip install . pyinstaller pytest

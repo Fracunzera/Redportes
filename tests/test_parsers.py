@@ -133,3 +133,11 @@ def test_analisis_salida_directa():
     a = internet.analizar_saltos(saltos, "192.168.0.1")
     assert not a["doble_nat"] and not a["cgnat"]
     assert "Salida directa" in a["conclusiones"][0]
+
+
+def test_manuf_wireshark():
+    from redportes.oui import parsear_manuf
+
+    t = ("# comentario\n00:00:0C\tCisco\tCisco Systems, Inc\n"
+         "4C:5E:0C\tRouterbo\tRouterboard.com\n00:1B:C5:00:00:00/36\tX\tY\n")
+    assert parsear_manuf(t) == [("00000C", "Cisco Systems, Inc"), ("4C5E0C", "Routerboard.com")]
