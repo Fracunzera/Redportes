@@ -105,7 +105,7 @@ def mapa_svg(r: dict) -> str:
         saltos = [x for x in r["internet"]["saltos"] if x.get("ip") != puerta][:6]
     nodos = [("router", puerta or "Router")] + [("salto", x) for x in saltos] + [("internet", "")]
     xs = [60 + i * ((ancho - 140) / max(1, len(nodos) - 1)) for i in range(len(nodos))]
-    y0 = 55
+    y0 = 62
     for i in range(len(nodos) - 1):
         punteada = ' stroke-dasharray="5 4"' if not saltos else ""
         s.append(f'<line x1="{xs[i]:.0f}" y1="{y0}" x2="{xs[i+1]:.0f}" y2="{y0}" '
@@ -126,9 +126,9 @@ def mapa_svg(r: dict) -> str:
                      f'<circle r="20" fill="#2563eb" stroke="{ring}" stroke-width="4"/>'
                      f'<text text-anchor="middle" y="5" font-size="12" fill="#fff" '
                      f'font-weight="700">GW</text>'
-                     f'<text x="28" y="-8" font-size="11" font-weight="600" '
+                     f'<text x="-22" y="-40" font-size="11" font-weight="600" '
                      f'fill="#0f172a">{_e(dato)}</text>'
-                     f'<text x="28" y="18" font-size="10" fill="#64748b">{_e(sub)}</text></g>')
+                     f'<text x="-22" y="-27" font-size="10" fill="#64748b">{_e(sub)}</text></g>')
         else:
             color = {"privada": "#f59e0b", "cgnat": "#dc2626"}.get(dato.get("tipo"), "#94a3b8")
             etiqueta = {"privada": "privada", "cgnat": "CGNAT", "publica": "operador",
