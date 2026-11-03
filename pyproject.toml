@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redportes"
+dynamic = ["version"]
+description = "Escáner de red local para técnicos de campo: mapa, qué hay conectado, qué revisar e informe para PDF."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = ["psutil>=5.8"]
+keywords = ["redes", "escaner", "nmap", "sysadmin", "inventario", "auditoria"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Environment :: Console",
+  "Topic :: System :: Networking",
+  "Natural Language :: Spanish",
+]
+
+[project.urls]
+Repositorio = "https://github.com/Fracunzera/Redportes"
+
+[project.scripts]
+redportes = "redportes.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.dynamic]
+version = { attr = "redportes.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["redportes*"]
