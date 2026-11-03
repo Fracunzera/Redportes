@@ -200,6 +200,17 @@ def _comandos(lista, nombres) -> str:
     return "".join(res)
 
 
+def _bloque_salud(r: dict) -> str:
+    from redportes import salud
+
+    sd = r.get("salud") or salud.calcular(r)
+    motivos = "".join(f"<li>{_e(m)}</li>" for m in sd["motivos"])
+    return (f'<section class="salud"><div class="nota-salud" style="border-color:{sd["color"]};'
+            f'color:{sd["color"]}"><b>{sd["puntaje"]}</b><span>/100</span></div>'
+            f'<div><div class="salud-tit">Salud de la red: <b style="color:{sd["color"]}">'
+            f'{_e(sd["estado"])}</b></div><ul class="motivos">{motivos}</ul></div></section>')
+
+
 def _tarjeta(valor, etiqueta, color="#0f172a") -> str:
     return (f'<div class="tarjeta"><div class="valor" style="color:{color}">{_e(valor)}</div>'
             f'<div class="etq">{_e(etiqueta)}</div></div>')
@@ -228,6 +239,7 @@ const s=getSelection();s.removeAllRanges();s.addRange(r)}})}}</script></head><bo
   · {_e(r['sistema'])} · {r['duracion_s']} s</div></div>
   <button class="no-print" onclick="window.print()">Guardar como PDF</button>
 </header>
+{_bloque_salud(r)}
 <section class="tarjetas">
   {_tarjeta(len(r['equipos']), 'equipos encontrados')}
   {_tarjeta(cuenta['alto'], 'hallazgos altos', NIVEL_COLOR['alto'])}
@@ -356,6 +368,12 @@ h2{font-size:18px;margin:30px 0 10px;border-bottom:1px solid #e2e8f0;padding-bot
 h3{font-size:14px;margin:14px 0 4px}
 .meta,.gris,.nota{color:#64748b}.nota{font-size:13px}
 button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+.salud{display:flex;gap:18px;align-items:center;margin-top:20px;border:1px solid #e2e8f0;
+  border-radius:10px;padding:14px 18px}
+.nota-salud{width:92px;height:92px;border-radius:50%;border:7px solid;display:flex;align-items:baseline;
+  justify-content:center;padding-top:20px;flex:none}
+.nota-salud b{font-size:32px;line-height:1}.nota-salud span{font-size:12px;color:#64748b}
+.salud-tit{font-size:17px}.motivos{margin:4px 0 0;padding-left:18px;color:#475569;font-size:13px}
 .tarjetas{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
 .tarjeta{border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
 .valor{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}

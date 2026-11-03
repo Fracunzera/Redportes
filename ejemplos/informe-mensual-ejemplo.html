@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe mensual · Noviembre de 2026 · Red 192.168.50.0/24 — Ferretería El Tornillo · Redportes</title><style>
+*{box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;color:#0f172a;
+  margin:0 auto;max-width:1100px;padding:28px 24px;line-height:1.45;background:#fff}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  border-bottom:2px solid #0f172a;padding-bottom:14px}
+.marca{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#2563eb;font-weight:700}
+h1{margin:2px 0 4px;font-size:26px}
+h2{font-size:18px;margin:30px 0 10px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+h3{font-size:14px;margin:14px 0 4px}
+.meta,.gris,.nota{color:#64748b}.nota{font-size:13px}
+button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+.salud{display:flex;gap:18px;align-items:center;margin-top:20px;border:1px solid #e2e8f0;
+  border-radius:10px;padding:14px 18px}
+.nota-salud{width:92px;height:92px;border-radius:50%;border:7px solid;display:flex;align-items:baseline;
+  justify-content:center;padding-top:20px;flex:none}
+.nota-salud b{font-size:32px;line-height:1}.nota-salud span{font-size:12px;color:#64748b}
+.salud-tit{font-size:17px}.motivos{margin:4px 0 0;padding-left:18px;color:#475569;font-size:13px}
+.tarjetas{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+.tarjeta{border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
+.valor{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.etq{font-size:12px;color:#64748b}
+.mapa{border:1px solid #e2e8f0;border-radius:10px;padding:8px;overflow-x:auto}
+.mapa svg{width:100%;min-width:700px;height:auto;display:block}
+.hallazgo{border:1px solid #e2e8f0;border-left:5px solid;border-radius:8px;padding:10px 14px;margin:10px 0;
+  break-inside:avoid}
+.hallazgo p{margin:6px 0 0;font-size:14px}
+.h-tit{font-weight:600}
+.nivel{color:#fff;font-size:11px;border-radius:4px;padding:2px 6px;margin-right:4px;text-transform:uppercase}
+.tabla{overflow-x:auto}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;font-size:12px;color:#334155}
+.leyenda i{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;
+  border-radius:50%;color:#fff;font-style:normal;font-size:9px;font-weight:700;margin-right:5px;
+  vertical-align:-3px}
+.afectados{margin:6px 0 0;padding-left:18px;font-size:14px}
+.cmd{margin-top:8px}.cmd-tit{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.cmd pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 0;
+  font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,Consolas,monospace}
+.copiar{background:#e2e8f0;color:#0f172a;padding:2px 8px;font-size:11px;border-radius:4px}
+.chip{background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:600}
+td.lat{white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid #e2e8f0}
+th{background:#f8fafc;font-weight:600}
+tr{break-inside:avoid}
+.mono,code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+footer{margin-top:36px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b}
+@media (max-width:700px){.tarjetas{grid-template-columns:repeat(2,1fr)}header{flex-direction:column}}
+@media print{.no-print{display:none}body{padding:0;max-width:none}.mapa svg{min-width:0}
+  .tabla{overflow:visible}table{font-size:10.5px}th,td{padding:4px 5px}
+  td{overflow-wrap:anywhere}.mono{font-size:9.5px}td.mono{white-space:nowrap;overflow-wrap:normal}
+  h2{break-after:avoid}@page{margin:14mm}}
+
+.resumen{font-size:16px;background:#f8fafc;border-radius:10px;padding:14px 18px;border:1px solid #e2e8f0}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:700px){.dos{grid-template-columns:1fr}}
+</style></head><body>
+<header><div><div class="marca">Redportes</div><h1>Informe mensual · Noviembre de 2026</h1>
+<div class="meta">Red 192.168.50.0/24 — Ferretería El Tornillo · 2 visitas en el mes ·
+última: 20/11/2026 10:00</div></div>
+<button class="no-print" onclick="window.print()">Guardar como PDF</button></header>
+<section class="salud"><div class="nota-salud" style="border-color:#dc2626;color:#dc2626">
+<b>41</b><span>/100</span></div><div><div class="salud-tit">Salud de la red:
+<b style="color:#dc2626">En riesgo</b></div><div style="color:#dc2626;font-weight:600">▼ 29 respecto de la visita anterior</div>
+<ul class="motivos"><li>1 hallazgo grave (−20)</li><li>5 hallazgos medios (−25)</li><li>5 hallazgos leves (−10)</li><li>1 equipo sin identificar (−1)</li><li>doble NAT (−3)</li></ul></div></section>
+<section><h2>Resumen</h2><p class="resumen">Durante noviembre de 2026 se hicieron 2 relevamientos de la red 192.168.50.0/24 (Ferretería El Tornillo). La salud de la red quedó en 41/100 (en riesgo), 29 puntos menos que en la visita anterior. Hay 12 equipos conectados: aparecieron 2 nuevos. Surgieron 4 problemas nuevos. Quedan 11 puntos para revisar, 1 de ellos grave.</p></section>
+<section><h2>Evolución de la salud</h2><div class="mapa"><svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de la salud de la red" font-family="inherit"><line x1="40" x2="860" y1="68" y2="68" stroke="#16a34a" stroke-dasharray="4 4" stroke-width="1" opacity=".6"/><text x="34" y="72" text-anchor="end" font-size="10" fill="#64748b">80</text><line x1="40" x2="860" y1="96" y2="96" stroke="#ca8a04" stroke-dasharray="4 4" stroke-width="1" opacity=".6"/><text x="34" y="100" text-anchor="end" font-size="10" fill="#64748b">60</text><polyline fill="none" stroke="#2563eb" stroke-width="2.5" points="40,158 245,158 450,82 655,113 860,123"/><circle cx="40" cy="158" r="4.5" fill="#dc2626"><title>2026-08-12: 16</title></circle><text x="40" y="148" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">16</text><text x="40" y="206" text-anchor="middle" font-size="10" fill="#64748b">12/08</text><circle cx="245" cy="158" r="4.5" fill="#dc2626"><title>2026-09-10: 16</title></circle><text x="245" y="148" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">16</text><text x="245" y="206" text-anchor="middle" font-size="10" fill="#64748b">10/09</text><circle cx="450" cy="82" r="4.5" fill="#ca8a04"><title>2026-10-08: 70</title></circle><text x="450" y="72" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">70</text><text x="450" y="206" text-anchor="middle" font-size="10" fill="#64748b">08/10</text><circle cx="655" cy="113" r="4.5" fill="#dc2626"><title>2026-11-02: 48</title></circle><text x="655" y="103" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">48</text><text x="655" y="206" text-anchor="middle" font-size="10" fill="#64748b">02/11</text><circle cx="860" cy="123" r="4.5" fill="#dc2626"><title>2026-11-20: 41</title></circle><text x="860" y="113" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">41</text><text x="860" y="206" text-anchor="middle" font-size="10" fill="#64748b">20/11</text></svg></div></section>
+<section class="dos"><div><h2>Equipos nuevos <span class="gris">(2)</span></h2>
+<ul><li><b class="mono">192.168.50.61</b> Cámara IP / grabador <span class="gris">Zhejiang Dahua Technology · 3C:EF:8C:00:53:3D</span></li><li><b class="mono">192.168.50.40</b> MikroTik <span class="gris">MikroTik · 4C:5E:0C:00:00:40</span></li></ul></div>
+<div><h2>Dejaron de aparecer <span class="gris">(0)</span></h2>
+<p class="gris">Ninguno.</p></div></section>
+<section class="dos"><div><h2>Problemas resueltos <span class="gris">(0)</span></h2>
+<p class="gris">Ninguno.</p></div>
+<div><h2>Problemas nuevos <span class="gris">(4)</span></h2>
+<ul><li><span class="nivel" style="background:#dc2626">Alto</span> Acepta SMBv1 — <b class="mono">192.168.50.20</b> <span class="gris">CAJA-PC · puerto 445</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Panel web sin cifrar — <b class="mono">192.168.50.61</b> <span class="gris">Zhejiang Dahua Technology · puerto 80 «WEB SERVICE»</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Cámara / grabador en la red general — <b class="mono">192.168.50.61</b> <span class="gris">Zhejiang Dahua Technology</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Winbox accesible — <b class="mono">192.168.50.40</b> <span class="gris">MikroTik · puerto 8291</span></li></ul></div></section>
+<section><h2>Pendientes <span class="gris">(11)</span></h2>
+<ul><li><span class="nivel" style="background:#dc2626">Alto</span> Acepta SMBv1 — <b class="mono">192.168.50.20</b> <span class="gris">CAJA-PC · puerto 445</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Panel web sin cifrar — <b class="mono">192.168.50.1</b> <span class="gris">TP-Link · puerto 80 «TL-WR840N»</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Escritorio remoto (RDP) abierto — <b class="mono">192.168.50.20</b> <span class="gris">CAJA-PC · puerto 3389</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Panel web sin cifrar — <b class="mono">192.168.50.30</b> <span class="gris">HP · puerto 80 «HP LaserJet M404»</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Panel web sin cifrar — <b class="mono">192.168.50.60</b> <span class="gris">Zhejiang Dahua Technology · puerto 80 «WEB SERVICE»</span></li><li><span class="nivel" style="background:#ea580c">Medio</span> Panel web sin cifrar — <b class="mono">192.168.50.61</b> <span class="gris">Zhejiang Dahua Technology · puerto 80 «WEB SERVICE»</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Panel web sin cifrar — <b class="mono">192.168.50.10</b> <span class="gris">Grandstream Networks · puerto 80 «Grandstream GXP1610»</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Panel web sin cifrar — <b class="mono">192.168.50.11</b> <span class="gris">Grandstream Networks · puerto 80</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Cámara / grabador en la red general — <b class="mono">192.168.50.60</b> <span class="gris">Zhejiang Dahua Technology</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Cámara / grabador en la red general — <b class="mono">192.168.50.61</b> <span class="gris">Zhejiang Dahua Technology</span></li><li><span class="nivel" style="background:#ca8a04">Bajo</span> Winbox accesible — <b class="mono">192.168.50.40</b> <span class="gris">MikroTik · puerto 8291</span></li></ul></section>
+<section><h2>Inventario por tipo</h2><div class="tabla"><table><thead><tr><th>Tipo de equipo</th>
+<th>Cantidad</th></tr></thead><tbody><tr><td>Teléfono IP / central</td><td>2</td></tr><tr><td>Cámara IP / grabador</td><td>2</td></tr><tr><td>Router (puerta de enlace)</td><td>1</td></tr><tr><td>PC / servidor Windows</td><td>1</td></tr><tr><td>Desconocido</td><td>1</td></tr><tr><td>Impresora</td><td>1</td></tr><tr><td>MikroTik</td><td>1</td></tr><tr><td>Celular o notebook (MAC aleatoria)</td><td>1</td></tr><tr><td>Celular / tablet (probable)</td><td>1</td></tr><tr><td>Este equipo</td><td>1</td></tr></tbody></table></div></section>
+<footer><p>Generado con Redportes 0.3.1 el 03/11/2026 17:09. Compara la última visita
+del mes con la última visita anterior al mes.</p></footer></body></html>

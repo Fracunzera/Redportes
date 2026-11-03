@@ -82,6 +82,7 @@ class App:
         self._armar_pie()
         self._cargar_interfaces()
         self._cargar_visitas()
+        self._actualizar_cb_avisar()
         raiz.after(100, self._leer_cola)
         raiz.after(800, self._ofrecer_oui)
 
@@ -120,6 +121,10 @@ class App:
                         variable=self.v_internet).pack(side="left")
         ttk.Checkbutton(opciones, text="Guardar en el historial de visitas",
                         variable=self.v_guardar).pack(side="left", padx=18)
+        self.v_avisar = tk.BooleanVar(value=False)
+        self.cb_avisar = ttk.Checkbutton(opciones, text="Avisar por Telegram si hay novedades",
+                                         variable=self.v_avisar)
+        self.cb_avisar.pack(side="left")
         self.b_escanear = ttk.Button(opciones, text="Escanear", style="Accion.TButton",
                                      command=self.escanear)
         self.b_escanear.pack(side="right")
@@ -130,6 +135,8 @@ class App:
         self.barra.pack(side="left")
         self.v_estado = tk.StringVar(value="Listo para escanear.")
         ttk.Label(estado, textvariable=self.v_estado).pack(side="left", padx=10)
+        self.l_salud = tk.Label(estado, text="", font=("TkDefaultFont", 11, "bold"))
+        self.l_salud.pack(side="right")
 
     def _tabla(self, padre, columnas: dict[str, int]) -> ttk.Treeview:
         marco = ttk.Frame(padre)
@@ -183,7 +190,8 @@ class App:
         bv = ttk.Frame(p4)
         bv.pack(fill="x", pady=(6, 0))
         ttk.Button(bv, text="Abrir informe de la visita", command=self.abrir_visita).pack(side="left")
-        ttk.Button(bv, text="Actualizar", command=self._cargar_visitas).pack(side="left", padx=6)
+        ttk.Button(bv, text="Informe mensual", command=self.informe_mensual).pack(side="left", padx=6)
+        ttk.Button(bv, text="Actualizar", command=self._cargar_visitas).pack(side="left")
         self.nb.add(p4, text="Visitas")
 
         p5 = ttk.Frame(self.nb, padding=6)
@@ -202,10 +210,11 @@ class App:
         self.b_guardar.pack(side="left", padx=6)
         ttk.Button(pie, text="Carpeta de informes",
                    command=lambda: abrir(carpeta_informes())).pack(side="left")
+        ttk.Button(pie, text="Inventario (Excel)", command=self.exportar_inventario).pack(side="left", padx=6)
+        ttk.Button(pie, text="Automatizar…", command=self.abrir_automatizar).pack(side="left")
         self.b_oui = ttk.Button(pie, text="Actualizar fabricantes", command=self.actualizar_oui)
         self.b_oui.pack(side="left", padx=6)
-        ttk.Label(pie, text="Usalo solo en redes donde tengas autorización.",
-                  foreground="#64748b").pack(side="right")
+
 
     # ------------------------------------------------------------ datos
 
@@ -270,7 +279,8 @@ class App:
         self.txt_log.delete("1.0", "end")
         self.v_estado.set(f"Escaneando {red}…")
         args = dict(cliente=self.v_cliente.get().strip(), con_internet=self.v_internet.get(),
-                    forzar=forzar, guardar=self.v_guardar.get())
+                    forzar=forzar, guardar=self.v_guardar.get(),
+                    avisar=self.v_avisar.get() and self._telegram_ok())
         threading.Thread(target=self._trabajo, args=(itf, red, puertos, args), daemon=True).start()
 
     def _trabajo(self, itf, red, puertos, args):
@@ -279,12 +289,24 @@ class App:
             r = escaneo.ejecutar(itf, red, puertos, cliente=args["cliente"],
                                  con_internet=args["con_internet"], forzar=args["forzar"],
                                  progreso=progreso)
-            cambios = None
+            cambios, previo = None, None
             if args["guardar"]:
                 previo = visitas.anterior(r["cliente"], r["red"])
                 visitas.guardar(r)
                 if previo:
                     cambios = visitas.comparar(previo, r)
+            if args["avisar"]:
+                from redportes import telegram
+
+                texto = telegram.armar_aviso(r, cambios, previo)
+                if texto:
+                    try:
+                        telegram.enviar(texto)
+                        self.cola.put(("progreso", "Aviso enviado por Telegram."))
+                    except telegram.ErrorTelegram as e:
+                        self.cola.put(("progreso", f"No se pudo avisar por Telegram: {e}"))
+                else:
+                    self.cola.put(("progreso", "Sin novedades: no se manda aviso por Telegram."))
             ruta = carpeta_informes() / informe.nombre_archivo(r["cliente"], r["red"])
             ruta.write_text(informe.generar(r, cambios), encoding="utf-8")
             self.cola.put(("fin", (r, cambios, ruta)))
@@ -369,6 +391,9 @@ class App:
             self.txt_internet.insert("end", "\nDNS: " + ", ".join(
                 f"{d['ip']} ({d['quien']})" for d in r["dns"]) + "\n")
 
+        sd = r.get("salud") or {}
+        if sd:
+            self.l_salud.configure(text=f"Salud: {sd['puntaje']}/100 · {sd['estado']}", fg=sd["color"])
         resumen = f"{len(r['equipos'])} equipos, {len(hall)} cosas para revisar."
         if cambios:
             resumen += (f" Desde la visita anterior: {len(cambios['nuevos'])} nuevos, "
@@ -401,6 +426,64 @@ class App:
             t.insert("end", h.comando, "cmd")
         t.configure(state="normal")  # se deja editable para poder seleccionar y copiar
         t.bind("<Key>", lambda ev: None if (ev.state & 4 and ev.keysym.lower() in ("c", "a")) else "break")
+
+    # ------------------------------------------------------------ inventario / mensual
+
+    def _telegram_ok(self) -> bool:
+        from redportes import telegram
+
+        return telegram.configurado()
+
+    def _actualizar_cb_avisar(self):
+        ok = self._telegram_ok()
+        self.cb_avisar.configure(state="normal" if ok else "disabled")
+        if not ok:
+            self.v_avisar.set(False)
+
+    def exportar_inventario(self):
+        from redportes import inventario
+
+        cliente = self.v_cliente.get().strip()
+        red = self.v_red.get().strip() or None
+        try:
+            filas = inventario.armar(cliente, red)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Redportes", str(e))
+            return
+        if not filas:
+            messagebox.showinfo("Redportes", "No hay visitas guardadas de ese cliente y red. "
+                                "Escaneá primero (con «Guardar en el historial» tildado).")
+            return
+        nombre = f"inventario_{(cliente or 'red').replace(' ', '_')}.csv"
+        destino = filedialog.asksaveasfilename(defaultextension=".csv", initialfile=nombre,
+                                               initialdir=str(carpeta_informes()),
+                                               filetypes=[("CSV para Excel", "*.csv")])
+        if destino:
+            inventario.exportar_csv(filas, Path(destino))
+            abrir(Path(destino))
+
+    def informe_mensual(self):
+        from redportes import mensual
+
+        sel = self.t_visitas.selection()
+        if not sel:
+            messagebox.showinfo("Redportes", "Elegí una visita: se arma el informe del mes de esa visita, "
+                                "para ese cliente y red.")
+            return
+        valores = self.t_visitas.item(sel[0], "values")
+        fecha, cliente, red = valores[1], valores[2], valores[3]
+        cliente = "" if cliente == "—" else cliente
+        try:
+            d = mensual.datos(cliente, red, fecha[:7])
+        except mensual.SinVisitas as e:
+            messagebox.showinfo("Redportes", str(e))
+            return
+        ruta = carpeta_informes() / mensual.nombre_archivo(cliente, red, fecha[:7])
+        ruta.write_text(mensual.generar(d), encoding="utf-8")
+        abrir(ruta)
+
+    def abrir_automatizar(self):
+        Automatizar(self)
 
     def _ofrecer_oui(self):
         """La primera vez, si no hay base completa de fabricantes, ofrece bajarla."""
@@ -465,7 +548,208 @@ class App:
         abrir(ruta)
 
 
+class Automatizar:
+    """Configura los avisos por Telegram y el escaneo diario automático."""
+
+    def __init__(self, app: App):
+        from redportes import telegram
+
+        self.app = app
+        self.cancelar = False
+        self.q: queue.Queue = queue.Queue()
+        v = self.v = tk.Toplevel(app.raiz)
+        v.title("Automatizar")
+        v.geometry("620x560")
+        v.transient(app.raiz)
+
+        # --- Telegram
+        f = ttk.LabelFrame(v, text=" 1. Avisos por Telegram ", padding=12)
+        f.pack(fill="x", padx=12, pady=(12, 6))
+        pasos = ("1) En Telegram, abrí @BotFather, mandá /newbot y seguí los pasos.\n"
+                 "2) Copiá el token que te da y pegalo acá abajo.\n"
+                 "3) Tocá «Conectar» y mandale cualquier mensaje a tu bot\n"
+                 "    (o agregalo a un grupo y escribí en el grupo, para que avise a todos).")
+        ttk.Label(f, text=pasos, justify="left").pack(anchor="w")
+        fila = ttk.Frame(f)
+        fila.pack(fill="x", pady=(8, 0))
+        ttk.Label(fila, text="Token:").pack(side="left")
+        self.v_token = tk.StringVar(value=(telegram.leer_config().get("telegram") or {}).get("token", ""))
+        ttk.Entry(fila, textvariable=self.v_token, show="•").pack(side="left", fill="x", expand=True, padx=6)
+        self.b_conectar = ttk.Button(fila, text="Conectar", command=self.conectar)
+        self.b_conectar.pack(side="left")
+        ttk.Button(fila, text="Probar", command=self.probar).pack(side="left", padx=(6, 0))
+        self.v_tg = tk.StringVar()
+        ttk.Label(f, textvariable=self.v_tg, foreground="#2563eb", wraplength=560).pack(anchor="w", pady=(8, 0))
+        self._estado_tg()
+
+        # --- Programación
+        g = ttk.LabelFrame(v, text=" 2. Escaneo automático diario ", padding=12)
+        g.pack(fill="both", expand=True, padx=12, pady=6)
+        cliente = app.v_cliente.get().strip() or "(sin nombre)"
+        ttk.Label(g, text=f"Cliente: {cliente}    Red: {app.v_red.get()}\n"
+                          "Se usan los datos cargados en la ventana principal. Si hay novedades "
+                          "(equipos nuevos, problemas graves nuevos o baja la salud) avisa por Telegram.",
+                  wraplength=560, justify="left").pack(anchor="w")
+        fila2 = ttk.Frame(g)
+        fila2.pack(fill="x", pady=8)
+        ttk.Label(fila2, text="Todos los días a las").pack(side="left")
+        self.v_hora = tk.StringVar(value="08:30")
+        ttk.Entry(fila2, textvariable=self.v_hora, width=6).pack(side="left", padx=6)
+        self.v_inet = tk.BooleanVar(value=app.v_internet.get())
+        ttk.Checkbutton(fila2, text="con salida a Internet", variable=self.v_inet).pack(side="left", padx=6)
+        ttk.Button(fila2, text="Programar", command=self.programar).pack(side="right")
+        ttk.Label(g, text="Escaneos programados:").pack(anchor="w", pady=(6, 2))
+        self.lista = tk.Listbox(g, height=5)
+        self.lista.pack(fill="both", expand=True)
+        ttk.Button(g, text="Borrar el seleccionado", command=self.borrar).pack(anchor="e", pady=(6, 0))
+        self._cargar_tareas()
+        v.protocol("WM_DELETE_WINDOW", self.cerrar)
+
+    def cerrar(self):
+        self.cancelar = True
+        self.app._actualizar_cb_avisar()
+        self.v.destroy()
+
+    def _estado_tg(self):
+        from redportes import telegram
+
+        t = telegram.leer_config().get("telegram") or {}
+        if t.get("chat_id"):
+            self.v_tg.set(f"✔ Conectado: los avisos llegan a «{t.get('chat') or t['chat_id']}» "
+                          f"mediante {t.get('bot', 'tu bot')}.")
+        else:
+            self.v_tg.set("Todavía no está configurado.")
+
+    def conectar(self):
+        from redportes import telegram
+
+        token = self.v_token.get().strip()
+        if not token:
+            messagebox.showinfo("Telegram", "Pegá primero el token que te dio @BotFather.", parent=self.v)
+            return
+        self.b_conectar.configure(state="disabled")
+        self.v_tg.set("Verificando el token…")
+
+        def trabajo():
+            try:
+                bot = telegram.nombre_bot(token)
+                self.q.put(("estado", f"Ahora mandale cualquier mensaje a {bot} en Telegram "
+                            "(o escribí en el grupo donde lo agregaste). Esperando hasta 2 minutos…"))
+                chat_id, nombre = telegram.esperar_chat(token, cancelado=lambda: self.cancelar)
+                cfg = telegram.leer_config()
+                cfg["telegram"] = {"token": token, "chat_id": chat_id, "chat": nombre, "bot": bot}
+                telegram.guardar_config(cfg)
+                telegram.enviar("✅ <b>Redportes</b> conectado. Los avisos van a llegar a este chat.")
+                msg = None
+            except telegram.ErrorTelegram as e:
+                msg = str(e)
+            except Exception as e:  # noqa: BLE001
+                msg = f"Error: {e}"
+            self.q.put(("fin", msg))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+        self.v.after(200, self._poll)
+
+    def _poll(self):
+        if self.cancelar:
+            return
+        try:
+            while True:
+                tipo, dato = self.q.get_nowait()
+                if tipo == "estado":
+                    self.v_tg.set(dato)
+                else:
+                    self._fin_conectar(dato)
+                    return
+        except queue.Empty:
+            pass
+        self.v.after(200, self._poll)
+
+    def _fin_conectar(self, error):
+        self.b_conectar.configure(state="normal")
+        if error:
+            self.v_tg.set(error)
+        else:
+            self._estado_tg()
+            self.app._actualizar_cb_avisar()
+            self.app.v_avisar.set(True)
+
+    def probar(self):
+        from redportes import telegram
+
+        try:
+            telegram.enviar("✅ <b>Redportes</b>: los avisos funcionan.")
+            messagebox.showinfo("Telegram", "Mensaje de prueba enviado.", parent=self.v)
+        except telegram.ErrorTelegram as e:
+            messagebox.showerror("Telegram", str(e), parent=self.v)
+
+    def _cargar_tareas(self):
+        from redportes import programar
+
+        self.lista.delete(0, "end")
+        try:
+            for t in programar.listar():
+                self.lista.insert("end", t)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def programar(self):
+        from redportes import programar, telegram
+
+        red = self.app.v_red.get().strip()
+        if not red:
+            messagebox.showinfo("Redportes", "Completá la red en la ventana principal.", parent=self.v)
+            return
+        if not telegram.configurado() and not messagebox.askyesno(
+                "Redportes", "Los avisos por Telegram no están configurados: el escaneo va a correr y "
+                "guardar el informe, pero no te va a avisar. ¿Programar igual?", parent=self.v):
+            return
+        try:
+            texto = programar.crear(self.app.v_cliente.get().strip(), red, self.v_hora.get(),
+                                    str(carpeta_informes()), self.v_inet.get())
+        except (ValueError, RuntimeError) as e:
+            messagebox.showerror("Redportes", str(e), parent=self.v)
+            return
+        messagebox.showinfo("Redportes", texto, parent=self.v)
+        self._cargar_tareas()
+
+    def borrar(self):
+        from redportes import programar
+
+        sel = self.lista.curselection()
+        if not sel:
+            return
+        nombre = self.lista.get(sel[0])
+        if messagebox.askyesno("Redportes", f"¿Borrar «{nombre}»?", parent=self.v):
+            try:
+                programar.borrar(nombre)
+            except RuntimeError as e:
+                messagebox.showerror("Redportes", str(e), parent=self.v)
+            self._cargar_tareas()
+
+
+def _modo_programado(args: list[str]) -> int:
+    """Escaneo sin ventana (tarea programada). La salida va a un log en la carpeta de datos."""
+    from redportes import cli
+    from redportes.sistema import carpeta_datos
+
+    log = (carpeta_datos() / "programado.log").open("a", encoding="utf-8")
+    sys.stdout = sys.stderr = log
+    from datetime import datetime
+
+    print(f"\n===== {datetime.now():%Y-%m-%d %H:%M:%S} {' '.join(args)}")
+    try:
+        return cli.main(args)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        return 1
+    finally:
+        log.flush()
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--programado":
+        return _modo_programado(sys.argv[2:])
     if ES_WINDOWS:
         try:  # nitidez en pantallas con escala
             import ctypes

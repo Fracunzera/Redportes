@@ -106,7 +106,7 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
     from redportes.internet import describir_dns
 
     lista = sorted(equipos.values(), key=lambda e: _orden_ip(e.ip))
-    return {
+    r = {
         "version": __version__,
         "cliente": cliente,
         "fecha": inicio.isoformat(timespec="seconds"),
@@ -123,6 +123,10 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         "internet": salida,
         "equipos": [a_dict(e) for e in lista],
     }
+    from redportes import salud
+
+    r["salud"] = salud.calcular(r)
+    return r
 
 
 def _orden_ip(ip: str) -> int:

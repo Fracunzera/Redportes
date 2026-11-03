@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import webbrowser
 from pathlib import Path
@@ -64,7 +65,7 @@ def cmd_escanear(args) -> int:
         print(str(e), file=sys.stderr)
         return 2
 
-    cambios = None
+    cambios, previo = None, None
     if not args.no_guardar:
         previo = visitas.anterior(r["cliente"], r["red"])
         id_visita = visitas.guardar(r)
@@ -74,7 +75,22 @@ def cmd_escanear(args) -> int:
 
     _resumen(r, cambios)
 
-    destino = Path(args.salida or _nombre_archivo(r["cliente"], r["red"]))
+    if args.avisar:
+        from redportes import telegram
+
+        texto = telegram.armar_aviso(r, cambios, previo)
+        if not texto:
+            _progreso("Sin novedades: no se manda aviso.")
+        else:
+            try:
+                telegram.enviar(texto)
+                _progreso("Aviso enviado por Telegram.")
+            except telegram.ErrorTelegram as e:
+                print(f"No se pudo avisar por Telegram: {e}", file=sys.stderr)
+
+    carpeta = Path(args.carpeta) if args.carpeta else Path.cwd()
+    carpeta.mkdir(parents=True, exist_ok=True)
+    destino = Path(args.salida) if args.salida else carpeta / _nombre_archivo(r["cliente"], r["red"])
     destino.write_text(informe.generar(r, cambios), encoding="utf-8")
     print(f"\nInforme: {destino.resolve()}")
     if args.json:
@@ -89,6 +105,10 @@ def _resumen(r: dict, cambios: dict | None) -> None:
     from redportes.escaneo import todos_los_hallazgos
 
     print()
+    sd = r.get("salud") or {}
+    if sd:
+        print(f"Salud de la red: {sd['puntaje']}/100 ({sd['estado']}) — " + "; ".join(sd["motivos"]))
+        print()
     print(f"{'IP':15} {'TIPO':28} {'FABRICANTE':24} PUERTOS")
     for e in r["equipos"]:
         puertos = ",".join(str(p["numero"]) for p in e["puertos"])
@@ -143,6 +163,97 @@ def cmd_informe(args) -> int:
     return 0
 
 
+def cmd_inventario(args) -> int:
+    from redportes import inventario
+
+    filas = inventario.armar(args.cliente, args.red)
+    if not filas:
+        print("No hay visitas guardadas para ese cliente/red.", file=sys.stderr)
+        return 2
+    base = re.sub(r"[^\w.-]+", "_", args.cliente or "red").strip("_") or "red"
+    destino = Path(args.salida or f"inventario_{base}.csv")
+    inventario.exportar_csv(filas, destino)
+    print(f"Inventario ({len(filas)} equipos): {destino.resolve()}")
+    return 0
+
+
+def cmd_mensual(args) -> int:
+    from datetime import date
+
+    from redportes import mensual, visitas
+
+    red = args.red
+    if not red:
+        filas = visitas.listar(args.cliente)
+        if not filas:
+            print("No hay visitas guardadas para ese cliente.", file=sys.stderr)
+            return 2
+        red = filas[-1][3]
+    mes = args.mes or date.today().strftime("%Y-%m")
+    try:
+        d = mensual.datos(args.cliente, red, mes)
+    except mensual.SinVisitas as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    destino = Path(args.salida or mensual.nombre_archivo(args.cliente, red, mes))
+    destino.write_text(mensual.generar(d), encoding="utf-8")
+    print(mensual.resumen_ejecutivo(d))
+    print(f"\nInforme mensual: {destino.resolve()}")
+    if args.abrir:
+        webbrowser.open(destino.resolve().as_uri())
+    return 0
+
+
+def cmd_telegram(args) -> int:
+    from redportes import telegram
+
+    try:
+        if args.probar:
+            telegram.enviar("✅ <b>Redportes</b>: los avisos funcionan.")
+            print("Mensaje de prueba enviado.")
+            return 0
+        if not args.token:
+            print("Uso: redportes telegram --token <token de @BotFather>   o   redportes telegram --probar")
+            return 2
+        bot = telegram.nombre_bot(args.token)
+        print(f"Bot {bot} encontrado. Ahora mandale cualquier mensaje desde Telegram "
+              "(o escribí en el grupo donde lo agregaste)… esperando 2 minutos.")
+        chat_id, nombre = telegram.esperar_chat(args.token)
+        cfg = telegram.leer_config()
+        cfg["telegram"] = {"token": args.token.strip(), "chat_id": chat_id, "chat": nombre, "bot": bot}
+        telegram.guardar_config(cfg)
+        telegram.enviar("✅ <b>Redportes</b> conectado. Los avisos van a llegar a este chat.")
+        print(f"Listo: los avisos van a llegar a «{nombre}».")
+        return 0
+    except telegram.ErrorTelegram as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+
+def cmd_programar(args) -> int:
+    from redportes import programar
+
+    try:
+        if args.listar:
+            tareas = programar.listar()
+            print("\n".join(tareas) if tareas else "No hay escaneos programados.")
+            return 0
+        if args.borrar:
+            programar.borrar(args.borrar)
+            print(f"Borrada: {args.borrar}")
+            return 0
+        if not args.red or not args.hora:
+            print("Uso: redportes programar --red 192.168.1.0/24 --hora 08:00 [-c CLIENTE] [--internet]",
+                  file=sys.stderr)
+            return 2
+        carpeta = args.carpeta or str(Path.home() / "Redportes")
+        print(programar.crear(args.cliente or "", args.red, args.hora, carpeta, args.internet, args.puertos))
+        return 0
+    except (ValueError, RuntimeError) as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+
 def cmd_actualizar_oui(_args) -> int:
     from redportes import oui
 
@@ -180,7 +291,39 @@ def construir_parser() -> argparse.ArgumentParser:
     e.add_argument("--sin-nmap", action="store_true", help="no usar nmap aunque esté instalado")
     e.add_argument("--no-guardar", action="store_true", help="no guardar la visita en el historial")
     e.add_argument("--forzar", action="store_true", help="permite redes más grandes que una /16")
+    e.add_argument("--avisar", action="store_true", help="avisa por Telegram si hay novedades")
+    e.add_argument("--carpeta", help="carpeta donde guardar el informe (por defecto la actual)")
     e.set_defaults(func=cmd_escanear)
+
+    iv = sub.add_parser("inventario", help="exporta el inventario de equipos a CSV (Excel)")
+    iv.add_argument("-c", "--cliente", default="")
+    iv.add_argument("-r", "--red")
+    iv.add_argument("-o", "--salida")
+    iv.set_defaults(func=cmd_inventario)
+
+    me = sub.add_parser("mensual", help="informe mensual de un cliente/red")
+    me.add_argument("-c", "--cliente", default="")
+    me.add_argument("-r", "--red", help="por defecto, la de la última visita del cliente")
+    me.add_argument("-m", "--mes", help="AAAA-MM (por defecto el mes actual)")
+    me.add_argument("-o", "--salida")
+    me.add_argument("--abrir", action="store_true")
+    me.set_defaults(func=cmd_mensual)
+
+    tg = sub.add_parser("telegram", help="configura o prueba los avisos por Telegram")
+    tg.add_argument("--token", help="token del bot creado con @BotFather")
+    tg.add_argument("--probar", action="store_true", help="manda un mensaje de prueba")
+    tg.set_defaults(func=cmd_telegram)
+
+    pr = sub.add_parser("programar", help="escaneo automático diario (tarea de Windows o cron)")
+    pr.add_argument("-r", "--red")
+    pr.add_argument("-c", "--cliente", default="")
+    pr.add_argument("--hora", help="HH:MM")
+    pr.add_argument("--internet", action="store_true")
+    pr.add_argument("-p", "--puertos", default="rapido")
+    pr.add_argument("--carpeta", help="dónde guardar los informes (por defecto ~/Redportes)")
+    pr.add_argument("--listar", action="store_true")
+    pr.add_argument("--borrar", metavar="NOMBRE")
+    pr.set_defaults(func=cmd_programar)
 
     sub.add_parser("interfaces", help="muestra las interfaces y la puerta de enlace").set_defaults(func=cmd_interfaces)
 
@@ -202,7 +345,8 @@ def construir_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = construir_parser()
-    comandos = {"escanear", "interfaces", "visitas", "informe", "actualizar-oui"}
+    comandos = {"escanear", "interfaces", "visitas", "informe", "actualizar-oui", "inventario",
+                "mensual", "telegram", "programar"}
     if not argv or (argv[0] not in comandos and argv[0] not in ("-h", "--help", "--version")):
         argv = ["escanear"] + argv
     args = parser.parse_args(argv)

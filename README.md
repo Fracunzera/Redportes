@@ -18,7 +18,11 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 - **IP WAN del router**: se la pregunta al propio router por UPnP o NAT-PMP (sin salir a Internet). Así se ve la IP privada que da el operador con **CGNAT** (100.64.x.x) o el **doble NAT**, aunque no la uses.
 - **Cómo sale a Internet** (opcional, con `--internet`): saltos hasta Internet, doble NAT, CGNAT, IP pública y qué DNS usa.
 - **Qué se ve desde Internet** (con `--internet`): consulta pasiva a [Shodan InternetDB](https://internetdb.shodan.io/) sobre la IP pública: puertos publicados (RDP, cámaras, Winbox…) y vulnerabilidades conocidas. No escanea nada; con CGNAT avisa que esa IP no es de tu red.
+- **Salud de la red (0 a 100)** con semáforo y los motivos del puntaje: un número que entiende cualquiera.
 - **Visitas por cliente**: guarda cada escaneo y en la siguiente visita te dice qué equipos son nuevos, cuáles ya no están y qué puertos se abrieron o cerraron.
+- **Informe mensual**: evolución de la salud, equipos nuevos y desaparecidos, problemas resueltos y nuevos, pendientes y un resumen listo para pegar en una nota.
+- **Inventario a Excel**: todos los equipos que pasaron por la red, con primera y última vez que se vieron.
+- **Escaneo automático diario con avisos por Telegram**: te avisa si aparece un equipo desconocido, un problema grave nuevo o si baja la salud. Usa un bot tuyo: no pasa por ningún servidor de terceros.
 - **Informe HTML** autocontenido (no carga nada de Internet) con botón *Guardar como PDF*.
 
 ## Qué NO hace
@@ -63,6 +67,24 @@ redportes actualizar-oui
 ```
 
 Sin eso usa la base de nmap si está instalado, o una lista mínima incorporada (MikroTik, Ubiquiti, Hikvision, Dahua, Raspberry Pi, virtualización…).
+
+## Avisos por Telegram y escaneo automático
+
+En la interfaz: **Automatizar…**
+
+1. En Telegram, abrí **@BotFather**, mandá `/newbot` y copiá el token que te da.
+2. Pegalo en Redportes, tocá **Conectar** y mandale cualquier mensaje a tu bot. Para que avise a todo un equipo, agregá el bot a un grupo y escribí en el grupo.
+3. Elegí la hora y tocá **Programar**: se crea una tarea programada de Windows (o una línea de cron en Linux/macOS) que escanea todos los días y avisa solo si hay novedades.
+
+Desde la consola:
+
+```bash
+redportes telegram --token 123456:ABC...      # conecta el bot (espera tu mensaje)
+redportes programar -c "Oficina" -r 192.168.1.0/24 --hora 08:30
+redportes programar --listar
+redportes mensual -c "Oficina" --mes 2026-11 --abrir
+redportes inventario -c "Oficina" -o inventario.csv
+```
 
 ## Redes grandes
 
