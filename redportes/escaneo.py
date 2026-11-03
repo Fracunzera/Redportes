@@ -81,20 +81,27 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
             e.smbv1 = puertos.acepta_smbv1(e.ip)
 
     progreso("Escuchando anuncios UPnP…")
-    for ip, anuncios in upnp.buscar(interfaz.ip).items():
+    anuncios_upnp, igd = upnp.buscar(interfaz.ip)
+    for ip, anuncios in anuncios_upnp.items():
         if ip in equipos:
             equipos[ip].upnp = anuncios
 
+    progreso("Preguntándole al router su IP WAN…")
+    from redportes import wan
+
+    ubicaciones = igd.get(puerta, []) + [u for ip, lista in igd.items() if ip != puerta for u in lista]
+    datos_wan = wan.ip_wan(puerta, ubicaciones)
+
     for e in equipos.values():
         clasificacion.clasificar(e)
-        e.hallazgos = hallazgos.evaluar(e)
+        e.hallazgos = hallazgos.evaluar(e, str(redip))
 
     salida = None
     if con_internet:
         progreso("Analizando la salida a Internet…")
         from redportes import internet
 
-        salida = internet.revisar(puerta)
+        salida = internet.revisar(puerta, cgnat_wan=datos_wan.get("tipo") == "cgnat")
 
     from redportes.internet import describir_dns
 
@@ -108,6 +115,7 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         "interfaz": a_dict(interfaz),
         "puerta": puerta,
         "dns": describir_dns(servidores_dns(), puerta),
+        "wan": datos_wan,
         "sistema": SO,
         "admin": es_admin(),
         "nmap": usar_nmap and tiene("nmap"),
@@ -125,4 +133,5 @@ def todos_los_hallazgos(resultado: dict) -> list:
     from redportes.modelo import Hallazgo
 
     lista = [Hallazgo(**h) for e in resultado["equipos"] for h in e.get("hallazgos", [])]
+    lista += [Hallazgo(**h) for h in ((resultado.get("internet") or {}).get("hallazgos") or [])]
     return hallazgos.ordenar(lista)

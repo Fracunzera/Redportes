@@ -26,6 +26,7 @@ class Hallazgo:
     ip: str = ""
     puerto: int | None = None
     detalle: str = ""  # dato puntual del equipo (puerto, título de la web…)
+    comando: str = ""  # arreglo listo para copiar (según la marca/sistema)
 
 
 @dataclass

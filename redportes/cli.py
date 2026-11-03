@@ -99,10 +99,15 @@ def _resumen(r: dict, cambios: dict | None) -> None:
         print(f"\nPara revisar ({len(hall)}):")
         for h in hall:
             print(f"  {_color(f'{h.nivel.upper():<6}', NIVEL_ANSI[h.nivel])} {h.ip:15} {h.titulo}")
+    w = r.get("wan") or {}
+    if w.get("texto"):
+        print(f"\nWAN del router: {w['texto']}")
     if r.get("internet"):
         print("\nSalida a Internet:")
         for c in r["internet"]["conclusiones"]:
             print(f"  - {c}")
+        if r["internet"].get("exposicion"):
+            print(f"  - Desde Internet (Shodan): {r['internet']['exposicion']}")
     if cambios:
         print(f"\nDesde la visita anterior: {len(cambios['nuevos'])} nuevos, "
               f"{len(cambios['faltan'])} ya no están, {len(cambios['cambios'])} cambiaron.")

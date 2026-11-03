@@ -14,7 +14,10 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 - **Qué es cada aparato**: IP, MAC, fabricante, nombre, sistema estimado, puertos abiertos y título de su panel web. Distingue routers, MikroTik, Ubiquiti, cámaras y grabadores, impresoras, teléfonos IP, servidores Windows/Linux/Proxmox, máquinas virtuales, Raspberry Pi y celulares (MAC aleatoria).
 - **Qué conviene revisar**, con explicación y solución:
   Telnet, SMBv1, FTP, paneles web sin HTTPS, RDP y VNC, API de MikroTik sin cifrar, Winbox abierto, PPTP, bases de datos expuestas, NFS, cámaras en la red general y UPnP activo en el router.
-- **Cómo sale a Internet** (opcional, con `--internet`): saltos hasta Internet, **doble NAT**, **CGNAT**, IP pública y qué DNS usa.
+- **Arreglos listos para copiar**: el comando exacto según el equipo (RouterOS en MikroTik, PowerShell en Windows, Linux), con botón *Copiar*.
+- **IP WAN del router**: se la pregunta al propio router por UPnP o NAT-PMP (sin salir a Internet). Así se ve la IP privada que da el operador con **CGNAT** (100.64.x.x) o el **doble NAT**, aunque no la uses.
+- **Cómo sale a Internet** (opcional, con `--internet`): saltos hasta Internet, doble NAT, CGNAT, IP pública y qué DNS usa.
+- **Qué se ve desde Internet** (con `--internet`): consulta pasiva a [Shodan InternetDB](https://internetdb.shodan.io/) sobre la IP pública: puertos publicados (RDP, cámaras, Winbox…) y vulnerabilidades conocidas. No escanea nada; con CGNAT avisa que esa IP no es de tu red.
 - **Visitas por cliente**: guarda cada escaneo y en la siguiente visita te dice qué equipos son nuevos, cuáles ya no están y qué puertos se abrieron o cerraron.
 - **Informe HTML** autocontenido (no carga nada de Internet) con botón *Guardar como PDF*.
 
@@ -23,7 +26,7 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 - No instala agentes ni modifica nada en los equipos.
 - No prueba contraseñas ni explota vulnerabilidades.
 - No necesita permisos de administrador (con ellos y con nmap obtiene más MACs).
-- No envía nada a Internet salvo que uses `--internet` o `actualizar-oui`.
+- No envía nada a Internet salvo que uses `--internet` (traceroute a 8.8.8.8, IP pública con ipify y consulta a Shodan InternetDB) o `actualizar-oui`.
 
 > ⚠️ **Usalo solo en redes donde tengas autorización.** Un escaneo de puertos puede disparar alertas en firewalls o equipos de seguridad: si hay un equipo de ciberseguridad, avisale antes.
 
@@ -113,6 +116,8 @@ El historial se guarda en `~/.local/share/redportes/visitas.db` (Linux), `%LOCAL
 | Puertos | Conexión TCP completa, sin privilegios; lee el `<title>` de las webs |
 | SMBv1 | Ofrece solo el dialecto SMBv1 y mira si el equipo lo acepta (sin autenticar) |
 | UPnP | Un M-SEARCH SSDP y escucha quién responde |
+| IP WAN | `GetExternalIPAddress` por UPnP IGD, o pedido NAT-PMP al puerto 5351 del router |
+| Exposición | Shodan InternetDB (datos que Shodan ya tiene, actualizados semanalmente; gratis para uso no comercial) |
 | Doble NAT / CGNAT | Traceroute: dos saltos privados seguidos = doble NAT; un salto en 100.64.0.0/10 = CGNAT |
 
 ## Publicar una versión

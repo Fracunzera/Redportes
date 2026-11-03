@@ -9,7 +9,75 @@ _WEB_PLANA = {80, 5000, 8000, 8080, 8081}
 _BASES = {3306: "MySQL", 1433: "SQL Server", 5432: "PostgreSQL", 6379: "Redis", 27017: "MongoDB"}
 
 
-def evaluar(e: Equipo) -> list[Hallazgo]:
+def plataforma(e: Equipo) -> str:
+    fab = (e.fabricante or "").lower()
+    if e.tipo == "MikroTik" or "mikrotik" in fab or "RouterOS" in (e.sistema or ""):
+        return "mikrotik"
+    if (e.sistema or "").startswith("Windows") or "Windows" in (e.tipo or ""):
+        return "windows"
+    sis = (e.sistema or "").lower()
+    if any(x in sis for x in ("linux", "debian", "ubuntu", "raspbian", "centos", "red hat", "fedora")):
+        return "linux"
+    return ""
+
+
+_MIKROTIK = {
+    "Telnet abierto": "/ip service disable telnet",
+    "FTP sin cifrar": "/ip service disable ftp",
+    "API de MikroTik sin cifrar": "/ip service disable api",
+    "Winbox accesible": "/ip service set winbox address={red}",
+    "Panel web sin cifrar": "/ip service disable www\n# Administrar por Winbox, o activar www-ssl con un certificado",
+    "UPnP activo en el router": "/ip upnp set enabled=no",
+    "VPN PPTP": "/interface pptp-server server set enabled=no",
+}
+_WINDOWS = {
+    "Acepta SMBv1": ("# PowerShell como administrador:\n"
+                     "Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force\n"
+                     "Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart"),
+    "Escritorio remoto (RDP) abierto": (
+        "# PowerShell como administrador (exige NLA):\n"
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' "
+        "-Name UserAuthentication -Value 1"),
+}
+_LINUX = {
+    "Telnet abierto": "# Ver qué programa usa el puerto 23:\nsudo ss -ltnp 'sport = :23'\n"
+                      "# Y desactivarlo, por ejemplo:\nsudo systemctl disable --now telnet.socket",
+    "FTP sin cifrar": "# Ver qué programa usa el puerto 21:\nsudo ss -ltnp 'sport = :21'\n"
+                      "# Si es vsftpd:\nsudo systemctl disable --now vsftpd",
+    "Acepta SMBv1": "# En /etc/samba/smb.conf, sección [global]:\nserver min protocol = SMB2_10\n"
+                    "# Después:\nsudo systemctl restart smbd",
+    "NFS / RPC expuesto": "# Ver qué se comparte y con quién:\nsudo exportfs -v\n# Ajustar /etc/exports y aplicar:\nsudo exportfs -ra",
+}
+_BASES_CMD = {
+    "Base de datos MySQL accesible por red": (
+        "# En /etc/mysql/mariadb.conf.d/50-server.cnf o /etc/mysql/mysql.conf.d/mysqld.cnf:\n"
+        "bind-address = 127.0.0.1\nsudo systemctl restart mariadb   # o mysql"),
+    "Base de datos PostgreSQL accesible por red": (
+        "# En postgresql.conf:\nlisten_addresses = 'localhost'\nsudo systemctl restart postgresql"),
+    "Base de datos Redis accesible por red": (
+        "# En /etc/redis/redis.conf:\nbind 127.0.0.1 -::1\nprotected-mode yes\nsudo systemctl restart redis-server"),
+    "Base de datos MongoDB accesible por red": (
+        "# En /etc/mongod.conf:\nnet:\n  bindIp: 127.0.0.1\nsudo systemctl restart mongod"),
+}
+
+
+def comando_para(e: Equipo, h: Hallazgo, red: str = "") -> str:
+    plat = plataforma(e)
+    tabla = {"mikrotik": _MIKROTIK, "windows": _WINDOWS, "linux": _LINUX}.get(plat, {})
+    cmd = tabla.get(h.titulo) or (_BASES_CMD.get(h.titulo) if plat != "windows" else "")
+    if not cmd:
+        return ""
+    return cmd.replace("{red}", red or "<red de administración>")
+
+
+def evaluar(e: Equipo, red: str = "") -> list[Hallazgo]:
+    h = _evaluar(e)
+    for x in h:
+        x.comando = comando_para(e, x, red)
+    return h
+
+
+def _evaluar(e: Equipo) -> list[Hallazgo]:
     p = e.abiertos()
     h: list[Hallazgo] = []
 

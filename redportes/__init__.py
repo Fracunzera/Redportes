@@ -1,3 +1,3 @@
 """Redportes: escáner de red local para técnicos de campo."""
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"

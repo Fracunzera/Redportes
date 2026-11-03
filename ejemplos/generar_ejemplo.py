@@ -24,12 +24,16 @@ eqs = [
  eq("192.168.50.100","D8:3A:DD:00:01:00","Raspberry Pi",[(22,"SSH","")],nombre="portatil-tecnico",es_este_equipo=True),
 ]
 for e in eqs:
-    clasificar(e); e.hallazgos = hallazgos.evaluar(e)
+    clasificar(e); e.hallazgos = hallazgos.evaluar(e, "192.168.50.0/24")
 saltos=[{"n":1,"ip":"192.168.50.1","ms":1.0},{"n":2,"ip":"192.168.1.1","ms":2.0},{"n":3,"ip":"100.72.0.1","ms":20.0},{"n":4,"ip":"","ms":None},{"n":5,"ip":"200.51.100.1","ms":23.0}]
 inet = analizar_saltos(saltos,"192.168.50.1"); inet["ip_publica"]="200.51.100.77"
+from redportes.internet import hallazgos_exposicion
+from redportes import wan
+_h, inet["exposicion"] = hallazgos_exposicion("200.51.100.77", {"puertos": [443]}, cgnat=True)
+inet["hallazgos"] = []
 r = {"version":"0.1.0","cliente":"Ferretería El Tornillo","fecha":"2026-11-03T16:20:00","duracion_s":38.2,"red":"192.168.50.0/24",
  "interfaz":{"nombre":"wlan0","ip":"192.168.50.100","mascara":"255.255.255.0","red":"192.168.50.0/24","mac":"","virtual":False},
- "puerta":"192.168.50.1","dns":[{"ip":"192.168.50.1","quien":"El router"}],"sistema":"Linux","admin":False,"nmap":True,
+ "puerta":"192.168.50.1", "wan": wan.describir("192.168.1.33", "UPnP"),"dns":[{"ip":"192.168.50.1","quien":"El router"}],"sistema":"Linux","admin":False,"nmap":True,
  "puertos_revisados":[21,22,23,80,135,445,554,3389,5060,8291,8728,9100,37777],"internet":inet,"equipos":[a_dict(e) for e in eqs]}
 prev = {**r, "fecha":"2026-09-10T11:00:00", "equipos":[x for x in r["equipos"] if x["ip"] not in ("192.168.50.61","192.168.50.40")]}
 import sys

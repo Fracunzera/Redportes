@@ -120,6 +120,8 @@ def mapa_svg(r: dict) -> str:
             gw = next((e for e in equipos if e["ip"] == puerta), None)
             ring = NIVEL_COLOR.get(_peor_nivel(gw), "#fff") if gw else "#fff"
             sub = _corto((gw or {}).get("fabricante") or "", 22)
+            if (r.get("wan") or {}).get("ip"):
+                sub = (sub + " · " if sub else "") + "WAN " + r["wan"]["ip"]
             s.append(f'<g transform="translate({x:.0f},{y0})"><title>Puerta de enlace {_e(dato)}</title>'
                      f'<circle r="20" fill="#2563eb" stroke="{ring}" stroke-width="4"/>'
                      f'<text text-anchor="middle" y="5" font-size="12" fill="#fff" '
@@ -181,6 +183,23 @@ def _leyenda(r: dict) -> str:
     return f'<div class="leyenda">{items}</div>'
 
 
+def _comandos(lista, nombres) -> str:
+    """Bloques de comandos listos para copiar; agrupa equipos con el mismo comando."""
+    por_cmd: dict[str, list[str]] = {}
+    for h in lista:
+        if h.comando:
+            por_cmd.setdefault(h.comando, []).append(h.ip)
+    if not por_cmd:
+        return ""
+    res = []
+    for cmd, ips in por_cmd.items():
+        para = "" if len(por_cmd) == 1 and len(ips) == len(lista) else f' — en {", ".join(ips)}'
+        res.append(f'<div class="cmd"><div class="cmd-tit">Cómo{_e(para)}:'
+                   f'<button class="copiar no-print" onclick="copiar(this)">Copiar</button></div>'
+                   f'<pre>{_e(cmd)}</pre></div>')
+    return "".join(res)
+
+
 def _tarjeta(valor, etiqueta, color="#0f172a") -> str:
     return (f'<div class="tarjeta"><div class="valor" style="color:{color}">{_e(valor)}</div>'
             f'<div class="etq">{_e(etiqueta)}</div></div>')
@@ -197,7 +216,11 @@ def generar(r: dict, cambios: dict | None = None) -> str:
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{_e(titulo)} · Redportes</title>
-<style>{CSS}</style></head><body>
+<style>{CSS}</style>
+<script>function copiar(b){{const t=b.parentNode.nextElementSibling.innerText;
+navigator.clipboard.writeText(t).then(()=>{{b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar",1500)}})
+.catch(()=>{{const r=document.createRange();r.selectNodeContents(b.parentNode.nextElementSibling);
+const s=getSelection();s.removeAllRanges();s.addRange(r)}})}}</script></head><body>
 <header>
   <div><div class="marca">Redportes</div>
   <h1>{_e(titulo)}</h1>
@@ -209,7 +232,7 @@ def generar(r: dict, cambios: dict | None = None) -> str:
   {_tarjeta(len(r['equipos']), 'equipos encontrados')}
   {_tarjeta(cuenta['alto'], 'hallazgos altos', NIVEL_COLOR['alto'])}
   {_tarjeta(cuenta['medio'], 'hallazgos medios', NIVEL_COLOR['medio'])}
-  {_tarjeta(r.get('puerta') or '—', 'puerta de enlace')}
+  {_tarjeta(r.get('puerta') or '—', 'puerta de enlace' + (f" · WAN {(r.get('wan') or {}).get('ip')}" if (r.get('wan') or {}).get('ip') else ''))}
 </section>
 <section><h2>Mapa</h2><div class="mapa">{mapa_svg(r)}</div>
 {_leyenda(r)}
@@ -220,11 +243,23 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
 
     # Salida a Internet
     partes.append('<section><h2>Salida a Internet</h2>')
+    w = r.get("wan") or {}
+    if w.get("ip"):
+        etq = {"cgnat": "CGNAT", "privada": "doble NAT", "publica": "IP pública"}.get(w.get("tipo"), "")
+        partes.append(f'<p>IP WAN del router: <b>{_e(w["ip"])}</b>'
+                      + (f' <span class="chip">{_e(etq)}</span>' if etq else "")
+                      + f' <span class="gris">(informada por el router vía {_e(w["metodo"])})</span></p>'
+                      f'<p>{_e(w["texto"])}</p>')
+    elif w:
+        partes.append(f'<p class="gris">{_e(w.get("texto", ""))}</p>')
     inet = r.get("internet")
     if inet:
         if inet.get("ip_publica"):
             partes.append(f'<p>IP pública vista desde afuera: <b>{_e(inet["ip_publica"])}</b></p>')
         partes.append("<ul>" + "".join(f"<li>{_e(c)}</li>" for c in inet["conclusiones"]) + "</ul>")
+        if inet.get("exposicion"):
+            partes.append(f'<p><b>Qué se ve desde Internet:</b> {_e(inet["exposicion"])} '
+                          f'<span class="gris">(fuente: Shodan InternetDB, consulta pasiva)</span></p>')
     else:
         partes.append('<p class="nota">No se analizó (se activa con <code>--internet</code>, '
                       'porque implica tráfico hacia afuera).</p>')
@@ -253,7 +288,8 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
             f'<div class="h-tit"><span class="nivel" style="background:{NIVEL_COLOR[nivel]}">'
             f'{NIVEL_TEXTO[nivel]}</span> {_e(titulo)}{cant}</div>'
             f'<ul class="afectados">{afectados}</ul>'
-            f'<p>{_e(h.que_es)}</p><p><b>Qué hacer:</b> {_e(h.que_hacer)}</p></div>')
+            f'<p>{_e(h.que_es)}</p><p><b>Qué hacer:</b> {_e(h.que_hacer)}</p>'
+            + _comandos(lista, nombres) + '</div>')
     partes.append("</section>")
 
     # Cambios
@@ -337,6 +373,11 @@ button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14p
   border-radius:50%;color:#fff;font-style:normal;font-size:9px;font-weight:700;margin-right:5px;
   vertical-align:-3px}
 .afectados{margin:6px 0 0;padding-left:18px;font-size:14px}
+.cmd{margin-top:8px}.cmd-tit{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.cmd pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:8px 10px;margin:4px 0 0;
+  font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,Consolas,monospace}
+.copiar{background:#e2e8f0;color:#0f172a;padding:2px 8px;font-size:11px;border-radius:4px}
+.chip{background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:600}
 td.lat{white-space:nowrap}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid #e2e8f0}

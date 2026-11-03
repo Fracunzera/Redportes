@@ -160,9 +160,11 @@ class App:
         self.t_hall = self._tabla(arriba, {"Nivel": 70, "Tema": 260, "IP": 120, "Equipo": 180,
                                            "Detalle": 260})
         self.t_hall.bind("<<TreeviewSelect>>", self._mostrar_hallazgo)
-        self.txt_hall = tk.Text(p2, height=6, wrap="word", relief="flat", padx=8, pady=6,
+        self.txt_hall = tk.Text(p2, height=9, wrap="word", relief="flat", padx=8, pady=6,
                                 background="#f8fafc", font="TkDefaultFont")
         self.txt_hall.pack(fill="x", pady=(6, 0))
+        self.txt_hall.tag_configure("cmd", font=("Consolas" if ES_WINDOWS else "Courier", 10),
+                                    background="#e2e8f0")
         self.txt_hall.tag_configure("b", font=(tkfont.nametofont("TkDefaultFont").actual("family"), 10, "bold"))
         self.txt_hall.insert("end", "Elegí un hallazgo para ver qué es y qué hacer.")
         self.txt_hall.configure(state="disabled")
@@ -336,12 +338,19 @@ class App:
                 h.nivel.upper(), h.titulo, h.ip, nombres.get(h.ip, ""), h.detalle))
 
         self.txt_internet.delete("1.0", "end")
+        w = r.get("wan") or {}
+        if w.get("ip"):
+            self.txt_internet.insert("end", f"IP WAN del router: {w['ip']} (vía {w['metodo']})\n")
+        if w.get("texto"):
+            self.txt_internet.insert("end", w["texto"] + "\n\n")
         inet = r.get("internet")
         if inet:
             if inet.get("ip_publica"):
                 self.txt_internet.insert("end", f"IP pública: {inet['ip_publica']}\n\n")
             for c in inet["conclusiones"]:
                 self.txt_internet.insert("end", f"• {c}\n\n")
+            if inet.get("exposicion"):
+                self.txt_internet.insert("end", f"Qué se ve desde Internet (Shodan): {inet['exposicion']}\n\n")
             self.txt_internet.insert("end", "Saltos:\n")
             for s in inet["saltos"]:
                 ms = f"{s['ms']:.0f} ms" if s.get("ms") is not None else ""
@@ -380,7 +389,11 @@ class App:
         t.insert("end", h.que_es + "\n")
         t.insert("end", "Qué hacer: ", "b")
         t.insert("end", h.que_hacer)
-        t.configure(state="disabled")
+        if h.comando:
+            t.insert("end", "\n\nComando (podés seleccionarlo y copiarlo):\n", "b")
+            t.insert("end", h.comando, "cmd")
+        t.configure(state="normal")  # se deja editable para poder seleccionar y copiar
+        t.bind("<Key>", lambda ev: None if (ev.state & 4 and ev.keysym.lower() in ("c", "a")) else "break")
 
     def abrir_informe(self):
         if self.ruta_informe:

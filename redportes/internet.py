@@ -8,6 +8,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import urllib.error
 import urllib.request
 
 from redportes.red import es_cgnat, es_privada
@@ -134,7 +135,86 @@ def describir_dns(servidores: list[str], puerta: str) -> list[dict]:
     return res
 
 
-def revisar(puerta: str) -> dict:
+# Puertos que no deberían verse nunca desde Internet en una red de oficina o casa.
+EXPUESTOS_GRAVES = {
+    21: "FTP", 23: "Telnet", 135: "MS-RPC", 139: "NetBIOS", 445: "SMB (carpetas compartidas)",
+    1433: "SQL Server", 3306: "MySQL", 3389: "Escritorio remoto (RDP)", 5432: "PostgreSQL",
+    5900: "VNC", 6379: "Redis", 8291: "Winbox (MikroTik)", 8728: "API de MikroTik",
+    9100: "Impresora", 27017: "MongoDB",
+}
+EXPUESTOS_MEDIOS = {
+    22: "SSH", 80: "Web (HTTP)", 554: "Cámaras (RTSP)", 1723: "VPN PPTP", 5060: "SIP (telefonía)",
+    7547: "TR-069 (administración del operador)", 8000: "Hikvision / web alternativa",
+    8080: "Web alternativa", 8443: "Web alternativa (HTTPS)", 37777: "Dahua",
+}
+
+
+def consultar_internetdb(ip: str) -> dict | None:
+    """Lo que Shodan ya vio de una IP (consulta pasiva, no escanea nada).
+
+    Devuelve {} si Shodan no tiene registros y None si no se pudo consultar.
+    """
+    try:
+        req = urllib.request.Request(f"https://internetdb.shodan.io/{ip}",
+                                     headers={"User-Agent": "redportes"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            datos = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        return {} if e.code == 404 else None
+    except Exception:
+        return None
+    return {
+        "puertos": sorted(datos.get("ports") or []),
+        "vulns": sorted(datos.get("vulns") or []),
+        "nombres": datos.get("hostnames") or [],
+        "etiquetas": datos.get("tags") or [],
+    }
+
+
+def hallazgos_exposicion(ip: str, info: dict | None, cgnat: bool) -> tuple[list, str]:
+    """Hallazgos a partir de InternetDB y un texto de resumen para el informe."""
+    from redportes.modelo import Hallazgo
+
+    if info is None:
+        return [], "No se pudo consultar la base de Shodan (InternetDB)."
+    if cgnat:
+        texto = (f"Tu salida es por CGNAT: la IP {ip} la comparten muchos clientes del operador, "
+                 "así que lo que Shodan vea en ella no es de esta red. Desde Internet no se puede "
+                 "entrar a esta red, salvo por conexiones que salgan desde adentro.")
+        return [], texto
+    if not info.get("puertos"):
+        return [], (f"Shodan no registra puertos abiertos en {ip}. Buena señal: no se ve nada "
+                    "publicado (Shodan actualiza estos datos una vez por semana).")
+    res = []
+    for p in info["puertos"]:
+        if p in EXPUESTOS_GRAVES:
+            nivel, nombre = "alto", EXPUESTOS_GRAVES[p]
+        elif p in EXPUESTOS_MEDIOS:
+            nivel, nombre = "medio", EXPUESTOS_MEDIOS[p]
+        else:
+            nivel, nombre = "bajo", f"puerto {p}"
+        res.append(Hallazgo(
+            nivel, "Publicado en Internet",
+            "Shodan vio este servicio abierto en la IP pública: cualquiera en Internet puede "
+            "intentar conectarse. Suele ser un port forward o una regla de DMZ en el router.",
+            "Revisar las redirecciones de puertos (NAT/port forward), UPnP y DMZ del router y quitar "
+            "lo que no haga falta. Para acceso remoto, usar una VPN en vez de publicar el servicio.",
+            ip, p, f"{nombre} (puerto {p})"))
+    if info.get("vulns"):
+        res.append(Hallazgo(
+            "alto", "Posibles vulnerabilidades en la IP pública",
+            "Shodan asocia vulnerabilidades conocidas (CVE) a las versiones de software que vio "
+            "publicadas en esta IP. Algunas pueden no estar verificadas.",
+            "Identificar qué equipo atiende esos puertos, actualizarlo y dejar de publicarlo.",
+            ip, None, ", ".join(info["vulns"][:8]) + (" …" if len(info["vulns"]) > 8 else "")))
+    texto = (f"Shodan vio {len(info['puertos'])} puerto(s) abierto(s) en {ip}: "
+             + ", ".join(map(str, info["puertos"]))
+             + ". Shodan actualiza estos datos una vez por semana: si la IP es dinámica, puede ser "
+             "de otro cliente que la tuvo antes.")
+    return res, texto
+
+
+def revisar(puerta: str, cgnat_wan: bool = False) -> dict:
     cmd = comando_traza()
     if cmd is None:
         res = analizar_saltos([], puerta)
@@ -143,4 +223,13 @@ def revisar(puerta: str) -> dict:
     else:
         res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=60)), puerta)
     res["ip_publica"] = ip_publica()
+    res["exposicion"], res["hallazgos"] = "", []
+    if res["ip_publica"]:
+        info = consultar_internetdb(res["ip_publica"])
+        hall, res["exposicion"] = hallazgos_exposicion(res["ip_publica"], info,
+                                                       res["cgnat"] or cgnat_wan)
+        res["shodan"] = info
+        from redportes.modelo import a_dict
+
+        res["hallazgos"] = [a_dict(h) for h in hall]
     return res
