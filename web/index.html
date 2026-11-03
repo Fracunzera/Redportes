@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redportes · Escáner de red gratis para técnicos</title>
+<meta name="description" content="Llegás a una red que no conocés y en un minuto tenés el mapa, qué es cada equipo, qué conviene revisar y un informe listo para PDF. Gratis y de código abierto.">
+<meta property="og:title" content="Redportes · Escáner de red gratis para técnicos">
+<meta property="og:description" content="Mapa de la red, qué es cada equipo, qué revisar con el comando para arreglarlo, CGNAT, diagnóstico e informes. Gratis y de código abierto.">
+<meta property="og:image" content="https://redportes.blucaro.site/img/informe.jpg">
+<meta property="og:type" content="website">
+<link rel="icon" href="img/icono.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#EDF2F6; --papel-2:#E1E9F0; --tinta:#0E2340; --tinta-suave:#4A5D78;
+  --cable:#1F5FD1; --cable-osc:#1648A3; --consola:#F4B400; --alerta:#D23A3A; --ok:#2E9E5B;
+  --titulo:"Bricolage Grotesque", system-ui, sans-serif;
+  --texto:"Atkinson Hyperlegible", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--papel);color:var(--tinta);font:18px/1.6 var(--texto)}
+img{max-width:100%;display:block}
+a{color:var(--cable)}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--consola);outline-offset:3px;border-radius:6px}
+.envoltura{max-width:1160px;margin:0 auto;padding:0 28px}
+
+/* Barra */
+.barra{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.marca{display:flex;align-items:center;gap:10px;font:800 22px/1 var(--titulo);color:var(--tinta);text-decoration:none;letter-spacing:-.01em}
+.marca img{width:34px;height:34px}
+.barra nav a{color:var(--tinta-suave);text-decoration:none;margin-left:22px;font-size:16px}
+.barra nav a:hover{color:var(--tinta)}
+
+/* Portada */
+.portada{display:grid;grid-template-columns:1.02fr 1fr;gap:40px;align-items:center;padding:38px 0 70px}
+h1{font:800 clamp(40px,5.6vw,68px)/1.02 var(--titulo);letter-spacing:-.025em;margin:0 0 22px;max-width:13ch}
+.bajada{font-size:21px;color:var(--tinta-suave);max-width:34em;margin:0 0 30px}
+.descargas{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.boton{display:inline-flex;flex-direction:column;justify-content:center;padding:15px 24px;border-radius:12px;
+  text-decoration:none;font-weight:700;line-height:1.2;transition:transform .15s,background .15s}
+.boton small{font-weight:400;font-size:14px;opacity:.85;margin-top:3px}
+.boton.principal{background:var(--cable);color:#fff;font-size:20px;box-shadow:0 6px 0 var(--cable-osc)}
+.boton.principal:hover{background:var(--cable-osc)}
+.boton.principal:active{transform:translateY(4px);box-shadow:0 2px 0 var(--cable-osc)}
+.boton.segundo{color:var(--tinta);border:2px solid var(--tinta);font-size:17px}
+.boton.segundo:hover{background:var(--tinta);color:var(--papel)}
+.nota{font-size:15px;color:var(--tinta-suave);margin:18px 0 0}
+
+/* Mapa animado */
+.mapa{width:100%;height:auto;overflow:visible}
+.mapa text{font-family:var(--texto)}
+.cable-linea{stroke:var(--tinta);stroke-width:2.5;fill:none}
+.nodo circle{stroke:var(--papel);stroke-width:4}
+@media (prefers-reduced-motion:no-preference){
+  .dibuja{stroke-dasharray:var(--l);stroke-dashoffset:var(--l);animation:trazo .7s ease-out forwards;animation-delay:var(--d)}
+  .aparece{opacity:0;transform-box:fill-box;transform-origin:center;animation:asoma .45s cubic-bezier(.3,1.6,.6,1) forwards;animation-delay:var(--d)}
+  .globo{opacity:0;animation:globo .5s ease-out forwards;animation-delay:var(--d)}
+  .latido{animation:latido 1.6s ease-in-out 3.6s 3}
+}
+@keyframes trazo{to{stroke-dashoffset:0}}
+@keyframes asoma{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
+@keyframes globo{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes latido{50%{r:24}}
+
+/* Secciones */
+section{padding:84px 0}
+h2{font:800 clamp(30px,3.6vw,44px)/1.08 var(--titulo);letter-spacing:-.02em;margin:0 0 18px;max-width:20ch}
+.intro{color:var(--tinta-suave);max-width:38em;margin:0 0 44px;font-size:19px}
+
+.pasos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:3px solid var(--tinta)}
+.pasos li{padding:26px 28px 6px 0;position:relative}
+.pasos li+li{padding-left:28px;border-left:2px solid var(--papel-2)}
+.pasos .n{font:800 56px/1 var(--titulo);color:var(--cable);display:block;margin-bottom:12px}
+.pasos h3{font:700 22px/1.2 var(--titulo);margin:0 0 8px}
+.pasos p{margin:0;color:var(--tinta-suave)}
+
+.muestra{background:var(--papel-2)}
+.muestra-grilla{display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:start}
+.capturas{position:relative;padding-bottom:70px}
+.capturas img{border-radius:10px;box-shadow:0 1px 0 rgba(14,35,64,.08),0 18px 40px -18px rgba(14,35,64,.45)}
+.capturas img+img{position:absolute;width:62%;right:-18px;bottom:0;border:4px solid var(--papel-2)}
+.funciones{margin:0}
+.funciones dt{font:700 19px/1.3 var(--titulo);margin-top:22px;display:flex;gap:10px;align-items:baseline}
+.funciones dt::before{content:"";flex:none;width:12px;height:12px;border-radius:50%;background:var(--c,var(--cable));transform:translateY(-1px)}
+.funciones dd{margin:4px 0 0 22px;color:var(--tinta-suave);font-size:17px}
+.funciones dt:first-child{margin-top:0}
+
+.limites{background:var(--tinta);color:var(--papel)}
+.limites h2{color:#fff}
+.limites ul{list-style:none;margin:28px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px 48px;max-width:900px}
+.limites li{font-size:19px;padding-left:34px;position:relative}
+.limites li::before{content:"";position:absolute;left:0;top:.5em;width:18px;height:3px;background:var(--consola)}
+.limites p{color:#B8C6DA;max-width:40em;margin:30px 0 0}
+
+.preguntas details{border-bottom:2px solid var(--papel-2);padding:4px 0}
+.preguntas summary{cursor:pointer;list-style:none;font:700 20px/1.3 var(--titulo);padding:18px 40px 18px 0;position:relative}
+.preguntas summary::-webkit-details-marker{display:none}
+.preguntas summary::after{content:"+";position:absolute;right:6px;top:12px;font:400 30px/1 var(--texto);color:var(--cable);transition:transform .2s}
+.preguntas details[open] summary::after{transform:rotate(45deg)}
+.preguntas details p{margin:0 0 20px;color:var(--tinta-suave);max-width:44em}
+.preguntas-grilla{display:grid;grid-template-columns:.8fr 1.2fr;gap:56px}
+
+.final{text-align:left;padding:90px 0 100px}
+.final .descargas{margin-top:26px}
+
+footer{border-top:2px solid var(--papel-2);padding:30px 0 40px;font-size:15px;color:var(--tinta-suave)}
+footer .envoltura{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+
+@media (max-width:900px){
+  .portada,.muestra-grilla,.preguntas-grilla{grid-template-columns:1fr}
+  .portada{padding-top:10px}
+  .mapa{max-width:560px}
+  .pasos{grid-template-columns:1fr}
+  .pasos li+li{padding-left:0;border-left:0;border-top:2px solid var(--papel-2)}
+  .limites ul{grid-template-columns:1fr}
+  .barra nav{display:none}
+  .capturas img+img{right:0}
+}
+</style>
+</head>
+<body>
+
+<div class="envoltura">
+  <header class="barra">
+    <a class="marca" href="#"><img src="img/icono.png" alt="">Redportes</a>
+    <nav aria-label="Secciones">
+      <a href="#como">Cómo se usa</a>
+      <a href="#que-muestra">Qué muestra</a>
+      <a href="#preguntas">Preguntas</a>
+      <a href="https://github.com/Fracunzera/Redportes">Código en GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+  <div class="portada">
+    <div>
+      <h1>Llegás a una red que no conocés. En un minuto sabés qué hay.</h1>
+      <p class="bajada">Redportes dibuja el mapa de la red, te dice qué es cada equipo, qué conviene revisar y cómo arreglarlo, y te deja un informe listo para entregar.</p>
+      <div class="descargas">
+        <a class="boton principal" href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-instalador.exe">
+          Descargar para Windows<small>Instalador, no pide administrador</small></a>
+        <a class="boton segundo" href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-portable.zip">
+          Versión portable<small>Para llevar en un pendrive</small></a>
+      </div>
+      <p class="nota">Gratis y de código abierto. Windows 10 y 11; en Linux y macOS se instala con
+        <a href="https://github.com/Fracunzera/Redportes#línea-de-comandos-linux-windows-macos">pip</a>.</p>
+    </div>
+
+    <svg class="mapa" viewBox="0 0 560 440" role="img" aria-label="Ejemplo de mapa de red: Internet, el router y seis equipos; uno tiene Telnet abierto.">
+      <!-- Internet -->
+      <g class="aparece" style="--d:.05s">
+        <ellipse cx="460" cy="62" rx="74" ry="36" fill="#fff" stroke="#0E2340" stroke-width="2.5"/>
+        <text x="460" y="68" text-anchor="middle" font-size="19" font-weight="700" fill="#0E2340">Internet</text>
+      </g>
+      <path class="cable-linea dibuja" style="--l:300;--d:.3s" d="M386 62 H120"/>
+      <g class="aparece" style="--d:.55s">
+        <circle cx="300" cy="62" r="11" fill="#fff" stroke="#D23A3A" stroke-width="3.5"/>
+        <text x="300" y="98" text-anchor="middle" font-size="13" fill="#4A5D78">100.64.12.1 · CGNAT</text>
+      </g>
+      <!-- Router -->
+      <g class="nodo aparece" style="--d:.7s">
+        <circle cx="96" cy="62" r="30" fill="#1F5FD1"/>
+        <text x="96" y="69" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">GW</text>
+      </g>
+      <text class="globo" style="--d:.85s" x="56" y="67" text-anchor="end" font-size="14" fill="#0E2340">Router</text>
+      <!-- Bus -->
+      <path class="cable-linea dibuja" style="--l:520;--d:1s" d="M96 92 V180 H510"/>
+      <!-- Equipos -->
+      <g font-size="13.5" text-anchor="middle">
+        <path class="cable-linea dibuja" style="--l:40;--d:1.35s" d="M150 180 V214"/>
+        <g class="nodo aparece" style="--d:1.45s"><circle cx="150" cy="240" r="22" fill="#2E9E5B"/><text x="150" y="246" fill="#fff" font-weight="700">C</text></g>
+        <text class="globo" style="--d:1.5s" x="150" y="284" fill="#0E2340">Celular</text>
+
+        <path class="cable-linea dibuja" style="--l:40;--d:1.5s" d="M240 180 V214"/>
+        <g class="nodo aparece" style="--d:1.6s"><circle cx="240" cy="240" r="22" fill="#D2337E" style="stroke:#F4B400;stroke-width:5"/><text x="240" y="246" fill="#fff" font-weight="700">C</text></g>
+        <text class="globo" style="--d:1.65s" x="240" y="284" fill="#0E2340">Cámara</text>
+
+        <path class="cable-linea dibuja" style="--l:40;--d:1.65s" d="M330 180 V214"/>
+        <g class="nodo aparece" style="--d:1.75s"><circle cx="330" cy="240" r="22" fill="#7C3AED"/><text x="330" y="246" fill="#fff" font-weight="700">I</text></g>
+        <text class="globo" style="--d:1.8s" x="330" y="284" fill="#0E2340">Impresora</text>
+
+        <path class="cable-linea dibuja" style="--l:40;--d:1.8s" d="M420 180 V214"/>
+        <g class="nodo aparece" style="--d:1.9s"><circle cx="420" cy="240" r="22" fill="#475569"/><text x="420" y="246" fill="#fff" font-weight="700">P</text></g>
+        <text class="globo" style="--d:1.95s" x="420" y="284" fill="#0E2340">PC Windows</text>
+
+        <path class="cable-linea dibuja" style="--l:40;--d:1.95s" d="M510 180 V214"/>
+        <g class="nodo aparece" style="--d:2.05s"><circle cx="510" cy="240" r="22" fill="#CA8A04"/><text x="510" y="246" fill="#fff" font-weight="700">S</text></g>
+        <text class="globo" style="--d:2.1s" x="510" y="284" fill="#0E2340">Servidor DNS</text>
+
+        <!-- MikroTik con problema -->
+        <path class="cable-linea dibuja" style="--l:230;--d:2.2s" d="M96 180 V370 H126"/>
+        <g class="nodo aparece" style="--d:2.45s"><circle class="latido" cx="150" cy="370" r="22" fill="#1F5FD1" style="stroke:#D23A3A;stroke-width:5"/><text x="150" y="376" fill="#fff" font-weight="700">M</text></g>
+        <text class="globo" style="--d:2.5s" x="150" y="414" fill="#0E2340">MikroTik</text>
+      </g>
+      <g class="globo" style="--d:2.9s">
+        <path d="M176 370 H214" stroke="#D23A3A" stroke-width="2" fill="none"/>
+        <rect x="214" y="322" width="266" height="96" rx="10" fill="#fff" stroke="#D23A3A" stroke-width="2"/>
+        <text x="230" y="350" font-size="15" font-weight="700" fill="#D23A3A">Telnet abierto</text>
+        <text x="230" y="373" font-size="13.5" fill="#4A5D78">La contraseña viaja sin cifrar.</text>
+        <rect x="228" y="384" width="238" height="24" rx="5" fill="#0E2340"/>
+        <text x="238" y="401" font-size="13" fill="#E1E9F0" font-family="Consolas, monospace">/ip service disable telnet</text>
+      </g>
+    </svg>
+  </div>
+  </main>
+</div>
+
+<section id="como">
+  <div class="envoltura">
+    <h2>Tres pasos, sin saber nada de GitHub</h2>
+    <p class="intro">Funciona en cualquier PC con Windows 10 u 11 conectada a la red que querés revisar.</p>
+    <ol class="pasos">
+      <li><span class="n">1</span><h3>Descargá e instalá</h3>
+        <p>Tocá «Descargar para Windows» y abrí el archivo. Si Windows avisa que «protegió su PC», tocá <b>Más información</b> y <b>Ejecutar de todas formas</b>.</p></li>
+      <li><span class="n">2</span><h3>Escaneá</h3>
+        <p>Escribí el nombre del cliente o del lugar y tocá <b>Escanear</b>. En un minuto aparece cada equipo con lo que hay que revisar.</p></li>
+      <li><span class="n">3</span><h3>Abrí el informe</h3>
+        <p>Tocá <b>Abrir informe</b>: se abre en el navegador y con <b>Guardar como PDF</b> lo tenés listo para entregar o archivar.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="muestra" id="que-muestra">
+  <div class="envoltura muestra-grilla">
+    <div class="capturas">
+      <img src="img/informe.jpg" alt="Informe de ejemplo: salud de la red 47 sobre 100, mapa con el router, cámaras, impresora y un MikroTik, y salida a Internet por CGNAT." width="1080" height="1350" loading="lazy">
+      <img src="img/hallazgos.jpg" alt="Lista de cosas para revisar con el comando para arreglar cada una." width="1080" height="1350" loading="lazy">
+    </div>
+    <div>
+      <h2>Lo que vas a ver</h2>
+      <dl class="funciones">
+        <dt>El mapa de la red</dt>
+        <dd>De Internet al router y del router a cada equipo, con un color por tipo.</dd>
+        <dt>Qué es cada aparato</dt>
+        <dd>Fabricante, sistema, puertos abiertos y el nombre de su panel web: cámaras, impresoras, MikroTik, teléfonos IP, Smart TV, servidores.</dd>
+        <dt style="--c:var(--alerta)">Qué revisar y cómo arreglarlo</dt>
+        <dd>Telnet, SMBv1, paneles sin HTTPS, RDP, UPnP en el router… explicado en castellano y con el comando para MikroTik, Windows o Linux.</dd>
+        <dt>Cómo sale a Internet</dt>
+        <dd>Doble NAT, CGNAT, la IP WAN del router y qué se ve de la red desde afuera.</dd>
+        <dt style="--c:var(--consola)">Diagnóstico de conexión</dt>
+        <dd>Si la falla es del Wi-Fi, del proveedor o del DNS, con el resultado listo para pegar en un chat.</dd>
+        <dt>Salud, historial e informe mensual</dt>
+        <dd>Un puntaje de 0 a 100, qué cambió desde la última visita, inventario a Excel y avisos por Telegram cuando aparece un equipo nuevo.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="limites">
+  <div class="envoltura">
+    <h2>Mira, no toca</h2>
+    <ul>
+      <li>No instala nada en los equipos</li>
+      <li>No prueba contraseñas</li>
+      <li>No cambia ninguna configuración</li>
+      <li>No manda datos a ningún lado sin tu permiso</li>
+    </ul>
+    <p>Todo queda en tu computadora. Igual, usalo solo en redes donde tengas autorización: un escaneo de puertos puede disparar alertas en equipos de seguridad.</p>
+  </div>
+</section>
+
+<section class="preguntas" id="preguntas">
+  <div class="envoltura preguntas-grilla">
+    <h2>Preguntas frecuentes</h2>
+    <div>
+      <details><summary>¿Es gratis de verdad?</summary>
+        <p>Sí. Es código abierto con licencia MIT: lo podés usar en tu trabajo, en clientes, modificarlo y compartirlo.</p></details>
+      <details><summary>¿Por qué Windows dice que «protegió su PC»?</summary>
+        <p>Porque el programa es nuevo y no tiene una firma digital paga. Tocá <b>Más información</b> y <b>Ejecutar de todas formas</b>. Si preferís revisarlo antes, el código completo está en GitHub.</p></details>
+      <details><summary>¿Instalador o portable?</summary>
+        <p>El instalador lo deja en el menú Inicio y guarda los informes en Documentos. La portable no instala nada: la descomprimís en un pendrive y guarda el historial y los informes dentro de su carpeta, así te lo llevás de cliente en cliente.</p></details>
+      <details><summary>¿Necesito saber de redes para usarlo?</summary>
+        <p>No para escanear y leer el informe: cada problema viene explicado y con qué hacer. Los comandos para arreglar son para quien administra esos equipos.</p></details>
+      <details><summary>¿Funciona en redes grandes?</summary>
+        <p>Sí, hasta una /16 (65.000 direcciones) sin preguntar. Con muchos equipos, el mapa los agrupa por subred.</p></details>
+      <details><summary>¿Y en Linux o macOS?</summary>
+        <p>Sí, con Python: <code>pipx install git+https://github.com/Fracunzera/Redportes</code>. Trae la consola (<code>redportes</code>) y la misma interfaz (<code>redportes-gui</code>).</p></details>
+      <details><summary>Encontré un error o tengo una idea</summary>
+        <p>Abrí un <a href="https://github.com/Fracunzera/Redportes/issues">issue en GitHub</a> contando qué pasó, y si podés, una captura del informe con las IPs tapadas.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="envoltura">
+    <h2>Probalo en la próxima red que te toque</h2>
+    <div class="descargas">
+      <a class="boton principal" href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-instalador.exe">
+        Descargar para Windows<small>Instalador</small></a>
+      <a class="boton segundo" href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-portable.zip">
+        Versión portable<small>Zip para pendrive</small></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="envoltura">
+    <span>Redportes es software libre, licencia MIT.</span>
+    <span><a href="https://github.com/Fracunzera/Redportes">Código fuente</a> &nbsp; <a href="https://github.com/Fracunzera/Redportes/releases">Todas las versiones</a></span>
+  </div>
+</footer>
+</body>
+</html>
