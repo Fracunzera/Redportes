@@ -115,6 +115,12 @@ El historial se guarda en `~/.local/share/redportes/visitas.db` (Linux), `%LOCAL
 | UPnP | Un M-SEARCH SSDP y escucha quién responde |
 | Doble NAT / CGNAT | Traceroute: dos saltos privados seguidos = doble NAT; un salto en 100.64.0.0/10 = CGNAT |
 
+## Publicar una versión
+
+1. Subir el número en `redportes/__init__.py`.
+2. En GitHub: *Releases → Draft a new release*, crear el tag `vX.Y.Z` y publicar.
+3. GitHub Actions arma el instalador de Windows y lo adjunta a la release solo (tarda un par de minutos).
+
 ## Desarrollo
 
 ```bash
