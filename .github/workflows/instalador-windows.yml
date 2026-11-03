@@ -106,10 +106,19 @@ jobs:
             dist/Redportes-*-instalador.exe
             dist/Redportes-*-portable.zip
 
+      # Nombres fijos: así el botón «Descargar» del README apunta siempre a la última versión
+      # (https://github.com/Fracunzera/Redportes/releases/latest/download/<nombre>).
+      - name: Nombres fijos para la descarga directa
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\release | Out-Null
+          Copy-Item (Get-Item dist\Redportes-*-instalador.exe) dist\release\Redportes-Windows-instalador.exe
+          Copy-Item (Get-Item dist\Redportes-*-portable.zip) dist\release\Redportes-Windows-portable.zip
+
       - name: Publicar en Releases
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Redportes-*-instalador.exe
-            dist/Redportes-*-portable.zip
+            dist/release/Redportes-Windows-instalador.exe
+            dist/release/Redportes-Windows-portable.zip

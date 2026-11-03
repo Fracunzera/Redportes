@@ -1,8 +1,53 @@
-# Redportes
+<p align="center">
+  <img src="redportes/recursos/icono.png" width="96" alt="">
+</p>
 
-**Escáner de red local para técnicos de campo.** Llegás a un cliente, nadie sabe qué hay conectado: corrés `redportes` y en un minuto tenés el mapa de la red, qué es cada equipo, qué conviene revisar (explicado en castellano y con qué hacer) y un informe listo para guardar como PDF.
+<h1 align="center">Redportes</h1>
 
-Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**.
+<p align="center">
+  <b>Escáner de red gratis para técnicos y para quien lleva la informática de una oficina.</b><br>
+  Llegás a una red que no conocés y en un minuto tenés el mapa, qué es cada equipo,<br>
+  qué conviene revisar (explicado en castellano) y un informe listo para PDF.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-instalador.exe">
+    <img src="https://img.shields.io/badge/%E2%AC%87%20DESCARGAR%20PARA%20WINDOWS-instalador-2563eb?style=for-the-badge" alt="Descargar para Windows (instalador)" height="44">
+  </a>
+  &nbsp;
+  <a href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-portable.zip">
+    <img src="https://img.shields.io/badge/%E2%AC%87%20VERSI%C3%93N%20PORTABLE-sin%20instalar-0f172a?style=for-the-badge" alt="Descargar versión portable" height="44">
+  </a>
+</p>
+
+<p align="center">
+  <sub>Gratis y de código abierto (MIT) · Windows 10/11 · también Linux y macOS ·
+  <a href="https://github.com/Fracunzera/Redportes/releases">versiones anteriores</a></sub>
+</p>
+
+---
+
+## Cómo descargarlo e instalarlo (Windows)
+
+No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
+
+**Opción 1 — Instalador** (lo más simple)
+
+1. Tocá **«Descargar para Windows»**. Se baja el archivo `Redportes-Windows-instalador.exe`.
+2. Abrilo desde la carpeta *Descargas*.
+3. Si aparece **«Windows protegió su PC»**, tocá **Más información** y después **Ejecutar de todas formas**. Aparece porque el programa es nuevo y no está firmado digitalmente: es normal en programas gratuitos.
+4. Tocá **Siguiente** hasta terminar. No pide permisos de administrador.
+5. Abrí **Redportes** desde el menú Inicio. La primera vez te ofrece bajar la lista de fabricantes: aceptá.
+
+**Opción 2 — Portable** (para llevar en un pendrive, sin instalar)
+
+1. Tocá **«Versión portable»**. Se baja `Redportes-Windows-portable.zip`.
+2. Hacé clic derecho sobre el archivo → **Extraer todo…** (en el pendrive o donde quieras).
+3. Entrá a la carpeta y abrí **`Redportes.exe`**. El historial y los informes se guardan dentro de esa misma carpeta.
+
+**Para usarlo:** escribí el nombre del cliente o del lugar, tocá **Escanear** y esperá un minuto. Después tocá **Abrir informe**.
+
+> ⚠️ Usalo solo en redes donde tengas autorización. Si hay un área de seguridad informática, avisale antes: un escaneo de puertos puede disparar alertas.
 
 ![Informe de ejemplo](docs/captura.png)
 
@@ -34,19 +79,11 @@ Libre, gratis y de código abierto (MIT). Funciona en **Linux, Windows y macOS**
 - No necesita permisos de administrador (con ellos y con nmap obtiene más MACs).
 - No envía nada a Internet salvo que uses `--internet` (traceroute a 8.8.8.8, IP pública con ipify y consulta a Shodan InternetDB) o `actualizar-oui`.
 
-> ⚠️ **Usalo solo en redes donde tengas autorización.** Un escaneo de puertos puede disparar alertas en firewalls o equipos de seguridad: si hay un equipo de ciberseguridad, avisale antes.
-
 ## Instalación
 
-### Windows (con interfaz gráfica)
+### Windows
 
-Bajá el instalador `Redportes-x.y.z-instalador.exe` de la sección [Releases](https://github.com/Fracunzera/Redportes/releases/latest) y ejecutalo. No pide permisos de administrador ni necesita Python. Queda en el menú Inicio como **Redportes**.
-
-**Versión portable:** en la misma release está `Redportes-x.y.z-portable.zip`. Descomprimilo donde quieras (por ejemplo en un pendrive) y abrí `Redportes.exe`. No instala nada y guarda el historial, la configuración y los informes dentro de su propia carpeta: ideal para llevar de cliente en cliente.
-
-> Como el instalador no está firmado digitalmente, Windows puede mostrar *«Windows protegió su PC»*: tocá **Más información → Ejecutar de todas formas**.
-
-Los informes se guardan en `Documentos\Redportes`.
+Ver [Cómo descargarlo e instalarlo](#cómo-descargarlo-e-instalarlo-windows), arriba de todo. Los informes se guardan en `Documentos\Redportes` (o en la carpeta `Informes` de la versión portable).
 
 ### Línea de comandos (Linux, Windows, macOS)
 
