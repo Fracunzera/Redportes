@@ -12,7 +12,7 @@ from redportes.escaneo import todos_los_hallazgos
 COLORES = {
     "Router": "#2563eb", "MikroTik": "#2563eb", "Equipo de red": "#2563eb", "Ubiquiti": "#0891b2",
     "Cámara": "#db2777", "Impresora": "#7c3aed", "Teléfono": "#0d9488", "PC": "#475569",
-    "Servidor": "#ca8a04", "Máquina virtual": "#ca8a04", "Raspberry": "#dc2626",
+    "Servidor": "#ca8a04", "Smart TV": "#9333ea", "NAS": "#ca8a04", "Domótica": "#0d9488", "Máquina virtual": "#ca8a04", "Raspberry": "#dc2626",
     "Celular": "#16a34a", "Este equipo": "#111827",
 }
 NIVEL_COLOR = {"alto": "#dc2626", "medio": "#ea580c", "bajo": "#ca8a04", "info": "#64748b"}
@@ -309,6 +309,7 @@ o con firewall puede no aparecer.</p></footer></body></html>""")
 
 CSS = """
 *{box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;color:#0f172a;
   margin:0 auto;max-width:1100px;padding:28px 24px;line-height:1.45;background:#fff}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
@@ -345,5 +346,7 @@ tr{break-inside:avoid}
 footer{margin-top:36px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b}
 @media (max-width:700px){.tarjetas{grid-template-columns:repeat(2,1fr)}header{flex-direction:column}}
 @media print{.no-print{display:none}body{padding:0;max-width:none}.mapa svg{min-width:0}
+  .tabla{overflow:visible}table{font-size:10.5px}th,td{padding:4px 5px}
+  td{overflow-wrap:anywhere}.mono{font-size:9.5px}td.mono{white-space:nowrap;overflow-wrap:normal}
   h2{break-after:avoid}@page{margin:14mm}}
 """

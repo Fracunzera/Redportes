@@ -14,6 +14,7 @@ class Puerto:
     titulo: str = ""   # <title> de la web, si es HTTP
     banner: str = ""   # primera línea que manda el servicio (SSH, FTP, Telnet)
     https: bool = False
+    a_https: bool = False  # HTTP que redirige a HTTPS
 
 
 @dataclass

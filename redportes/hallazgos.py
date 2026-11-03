@@ -69,7 +69,7 @@ def evaluar(e: Equipo) -> list[Hallazgo]:
                 "Hay recursos NFS publicados que podrían montarse desde otros equipos.",
                 "Revisar /etc/exports y limitar a las IP que corresponden.", 2049 if 2049 in p else 111)
 
-    web_plana = [x for x in e.puertos if x.numero in _WEB_PLANA and not x.https]
+    web_plana = [x for x in e.puertos if x.numero in _WEB_PLANA and not x.https and not x.a_https]
     tiene_https = any(x.https for x in e.puertos)
     if web_plana and not tiene_https:
         importante = e.es_puerta or "Cámara" in e.tipo or e.tipo in ("MikroTik", "Impresora")

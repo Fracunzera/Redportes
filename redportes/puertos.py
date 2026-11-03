@@ -7,6 +7,7 @@ import re
 import socket
 import ssl
 import struct
+from urllib.parse import urljoin, urlsplit
 from concurrent.futures import ThreadPoolExecutor
 
 from redportes.modelo import Puerto
@@ -78,29 +79,60 @@ def leer_banner(ip: str, puerto: int, timeout: float = 2.5) -> str:
     return texto.strip()[:120]
 
 
-def titulo_web(ip: str, puerto: int, https: bool, timeout: float = 3) -> tuple[str, bool]:
-    """Devuelve (título, es_https). Prueba HTTPS si HTTP falla en puertos alternativos."""
+def _pedir(ip: str, puerto: int, tls: bool, ruta: str, timeout: float):
+    if tls:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        c = http.client.HTTPSConnection(ip, puerto, timeout=timeout, context=ctx)
+    else:
+        c = http.client.HTTPConnection(ip, puerto, timeout=timeout)
+    try:
+        c.request("GET", ruta or "/", headers={"User-Agent": "redportes", "Connection": "close",
+                                                "Host": ip if puerto in (80, 443) else f"{ip}:{puerto}"})
+        r = c.getresponse()
+        cuerpo = r.read(65536).decode("utf-8", errors="replace")
+        return r.status, r.getheader("Location", "") or "", r.getheader("Server", "") or "", cuerpo
+    finally:
+        c.close()
+
+
+_META_REFRESH = re.compile(r"""<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>]+)""", re.I)
+
+
+def titulo_web(ip: str, puerto: int, https: bool, timeout: float = 3) -> tuple[str, bool, bool]:
+    """Devuelve (título, es_https, redirige_a_https).
+
+    Sigue hasta 4 redirecciones (HTTP o <meta refresh>) dentro del mismo equipo, para
+    mostrar el título real del panel en vez de «302» o «Redirecting…».
+    """
     intentos = [https, not https] if puerto not in (80, 443) else [https]
-    for usar_tls in intentos:
+    for tls_inicial in intentos:
+        tls, p, ruta = tls_inicial, puerto, "/"
+        a_https = False
         try:
-            if usar_tls:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                c = http.client.HTTPSConnection(ip, puerto, timeout=timeout, context=ctx)
-            else:
-                c = http.client.HTTPConnection(ip, puerto, timeout=timeout)
-            c.request("GET", "/", headers={"User-Agent": "redportes", "Connection": "close"})
-            r = c.getresponse()
-            cuerpo = r.read(65536).decode("utf-8", errors="replace")
-            servidor = r.getheader("Server", "") or ""
-            c.close()
+            for _ in range(5):
+                estado, destino, servidor, cuerpo = _pedir(ip, p, tls, ruta, timeout)
+                if not destino and estado == 200:
+                    m = _META_REFRESH.search(cuerpo)
+                    destino = m.group(1).strip() if m else ""
+                if not destino:
+                    break
+                actual = f"{'https' if tls else 'http'}://{ip}:{p}{ruta}"
+                u = urlsplit(urljoin(actual, destino))
+                if u.hostname and u.hostname != ip:
+                    return (f"→ {u.scheme}://{u.hostname}{u.path}")[:100], tls_inicial, u.scheme == "https"
+                tls = u.scheme == "https"
+                p = u.port or (443 if tls else 80)
+                ruta = u.path + (f"?{u.query}" if u.query else "") or "/"
+                if tls and not tls_inicial:
+                    a_https = True
             m = re.search(r"<title[^>]*>(.*?)</title>", cuerpo, re.I | re.S)
             titulo = re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
-            return (titulo or servidor or f"HTTP {r.status}")[:100], usar_tls
+            return (titulo or servidor or f"HTTP {estado}")[:100], tls_inicial, a_https
         except (OSError, http.client.HTTPException, ssl.SSLError, ValueError):
             continue
-    return "", https
+    return "", https, False
 
 
 # ---------------------------------------------------------------- SMBv1
@@ -150,7 +182,7 @@ def escanear(ips: list[str], puertos: list[int], progreso=lambda m: None) -> dic
         ip, p = par
         pu = Puerto(numero=p, servicio=SERVICIOS.get(p, ""))
         if p in _HTTP:
-            pu.titulo, pu.https = titulo_web(ip, p, p in _HTTPS)
+            pu.titulo, pu.https, pu.a_https = titulo_web(ip, p, p in _HTTPS)
         elif p in _BANNER:
             pu.banner = leer_banner(ip, p)
         return ip, pu

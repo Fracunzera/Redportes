@@ -12,6 +12,16 @@ from redportes import puertos
 
 class _Web(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/":
+            self.send_response(302)
+            self.send_header("Location", "/login.html")
+            self.end_headers()
+            return
+        if self.path == "/login.html":
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'<meta http-equiv="refresh" content="0; url=/panel">Redirecting...')
+            return
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"<html><head><title>Panel del router</title></head></html>")
@@ -35,8 +45,8 @@ def test_puerto_y_titulo():
     try:
         assert puertos.puerto_abierto("127.0.0.1", p)
         assert not puertos.puerto_abierto("127.0.0.1", _puerto_libre())
-        titulo, https = puertos.titulo_web("127.0.0.1", p, False)
-        assert titulo == "Panel del router" and not https
+        titulo, https, a_https = puertos.titulo_web("127.0.0.1", p, False)
+        assert titulo == "Panel del router" and not https and not a_https
     finally:
         srv.shutdown()
 

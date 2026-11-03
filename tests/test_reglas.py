@@ -112,3 +112,20 @@ def test_mapa_agrupa_redes_grandes():
     html = informe.generar(r, None)
     assert "10.0.0.0/24" in html and "200 equipos" in html
     assert "agrupa por subred" in html
+
+
+def test_apps_y_tv():
+    e = eq("192.168.3.45", puertos=[22, 53, 80])
+    e.puertos[2].titulo = "AdGuard Home"
+    clasificar(e)
+    assert e.tipo.startswith("Servidor DNS (AdGuard Home)")
+    tv = eq("192.168.3.50", fab="Hui Zhou Gaoshengda Technology")
+    clasificar(tv)
+    assert tv.tipo.startswith("Smart TV")
+
+
+def test_http_que_redirige_a_https_no_es_hallazgo():
+    e = eq("1.1.1.3", puertos=[80])
+    e.puertos[0].a_https = True
+    clasificar(e)
+    assert not any(h.titulo == "Panel web sin cifrar" for h in hallazgos.evaluar(e))

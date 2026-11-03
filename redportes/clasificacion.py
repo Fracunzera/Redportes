@@ -13,6 +13,27 @@ TELEFONOS_IP = ("grandstream", "yealink", "fanvil", "polycom", "snom", "htek", "
 VIRTUALES = ("vmware", "virtualbox", "qemu", "proxmox", "hyper-v", "xen")
 MOVILES = ("apple", "samsung", "xiaomi", "motorola", "huawei", "oppo", "vivo", "realme", "oneplus",
            "google", "honor")
+TVS = ("gaoshengda", "tcl", "hisense", "roku", "skyworth", "amlogic", "vizio", "noblex", "bgh",
+       "xiaomi communications")
+# Aplicaciones reconocibles por el título de su web: (palabra clave, nombre, tipo)
+APPS = (
+    ("adguard", "AdGuard Home", "Servidor DNS"), ("pi-hole", "Pi-hole", "Servidor DNS"),
+    ("home assistant", "Home Assistant", "Domótica"), ("octoprint", "OctoPrint", "Impresora 3D"),
+    ("unifi", "UniFi", "Controlador UniFi"), ("proxmox", "Proxmox VE", "Servidor Proxmox"),
+    ("nextcloud", "Nextcloud", "Servidor de archivos"), ("truenas", "TrueNAS", "NAS"),
+    ("synology", "Synology", "NAS"), ("qnap", "QNAP", "NAS"), ("openmediavault", "OpenMediaVault", "NAS"),
+    ("zabbix", "Zabbix", "Monitoreo"), ("grafana", "Grafana", "Monitoreo"),
+    ("portainer", "Portainer", "Servidor Docker"), ("jellyfin", "Jellyfin", "Servidor multimedia"),
+    ("plex", "Plex", "Servidor multimedia"), ("routeros", "RouterOS", "MikroTik"),
+    ("pfsense", "pfSense", "Firewall"), ("opnsense", "OPNsense", "Firewall"),
+)
+
+
+def aplicaciones(e: Equipo) -> list[tuple[str, str]]:
+    titulos = " ".join(p.titulo for p in e.puertos).lower()
+    return [(nombre, tipo) for clave, nombre, tipo in APPS if clave in titulos]
+
+
 RED = ("cisco", "tp-link", "tplink", "d-link", "netgear", "aruba", "ruckus", "zyxel", "juniper",
        "fortinet", "huawei technologies", "tenda", "mercusys")
 
@@ -53,6 +74,8 @@ def clasificar(e: Equipo) -> None:
         e.sistema = "MikroTik RouterOS (probable)"
     e.sistema = e.sistema or sistema_por_ttl(e.ttl)
 
+    apps = aplicaciones(e)
+    upnp = " ".join(e.upnp)
     if e.es_este_equipo:
         e.tipo = "Este equipo"
     elif e.es_puerta:
@@ -71,6 +94,8 @@ def clasificar(e: Equipo) -> None:
         e.tipo = "Teléfono IP / central"
     elif 8006 in p or e.sistema == "Proxmox VE":
         e.tipo = "Servidor Proxmox"
+    elif apps:
+        e.tipo = f"{apps[0][1]} ({', '.join(n for n, _ in apps)})"
     elif _tiene(fab, VIRTUALES):
         e.tipo = "Máquina virtual"
     elif "raspberry" in fab:
@@ -81,6 +106,8 @@ def clasificar(e: Equipo) -> None:
         e.tipo = "Equipo de red"
     elif 22 in p and e.sistema:
         e.tipo = "Servidor / equipo Linux"
+    elif _tiene(fab, TVS) or "MediaRenderer" in upnp:
+        e.tipo = "Smart TV / TV box (probable)"
     elif mac_aleatoria(e.mac):
         e.tipo = "Celular o notebook (MAC aleatoria)"
     elif _tiene(fab, MOVILES) and not p:
