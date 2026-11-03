@@ -18,6 +18,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Última base de fabricantes guardada
+        uses: actions/cache/restore@v4
+        with:
+          path: redportes/recursos/oui.csv
+          key: oui-${{ github.run_id }}
+          restore-keys: oui-
+
       - name: Base de fabricantes (IEEE) para incluir en el instalador
         continue-on-error: true
         timeout-minutes: 6
@@ -35,6 +42,13 @@ jobs:
               except Exception as e:
                   print("intento", intento + 1, "falló:", e)
                   time.sleep(20)
+
+      - name: Guardar la base de fabricantes para próximos armados
+        if: hashFiles('redportes/recursos/oui.csv') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: redportes/recursos/oui.csv
+          key: oui-${{ github.run_id }}
 
       - name: Dependencias
         run: pip install . pyinstaller pytest
