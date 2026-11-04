@@ -782,7 +782,9 @@ class App:
         self.txt_internet.delete("1.0", "end")
         w = r.get("wan") or {}
         if w.get("ip"):
-            self.txt_internet.insert("end", f"IP WAN del router: {w['ip']} (vía {w['metodo']})\n")
+            from redportes.wan import origen
+
+            self.txt_internet.insert("end", f"IP WAN del router: {w['ip']} ({origen(w)})\n")
         if w.get("texto"):
             self.txt_internet.insert("end", w["texto"] + "\n\n")
         inet = r.get("internet")

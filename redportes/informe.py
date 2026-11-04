@@ -8,6 +8,7 @@ from html import escape
 
 from redportes import AUTOR_URL, SITIO, __autor__, __version__
 from redportes.escaneo import todos_los_hallazgos
+from redportes.wan import origen as origen_wan
 
 COLORES = {
     "Router": "#2563eb", "MikroTik": "#2563eb", "Equipo de red": "#2563eb", "Ubiquiti": "#0891b2",
@@ -282,8 +283,7 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
         etq = {"cgnat": "CGNAT", "privada": "doble NAT", "publica": "IP pública"}.get(w.get("tipo"), "")
         partes.append(f'<p>IP WAN del router: <b>{_e(w["ip"])}</b>'
                       + (f' <span class="chip">{_e(etq)}</span>' if etq else "")
-                      + (f' <span class="gris">(vista por {_e(w["metodo"])})</span></p>' if w["metodo"].startswith("el servidor")
-                         else f' <span class="gris">(informada por el router vía {_e(w["metodo"])})</span></p>')
+                      + f' <span class="gris">({_e(origen_wan(w))})</span></p>'
                       + f'<p>{_e(w["texto"])}</p>')
     elif w:
         partes.append(f'<p class="gris">{_e(w.get("texto", ""))}</p>')

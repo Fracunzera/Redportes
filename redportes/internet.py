@@ -327,10 +327,12 @@ def revisar(puerta: str, cgnat_wan: bool = False, urls_proveedor: list[str] | No
     conocidos = proveedores_del_camino(res["saltos"], res["ip_publica"])
     res["proveedor"] = (ip_vista_por_proveedor(urls_proveedor, proveedores=conocidos)
                         if conocidos or urls_proveedor else None)
-    if res["proveedor"] and res["proveedor"]["cgnat"] and not res["cgnat"]:
-        res["cgnat"] = True
-        res["conclusiones"].insert(0, f"CGNAT confirmado por {res['proveedor']['proveedor']}: el router sale a "
-                                      f"Internet con la IP interna {res['proveedor']['ip']}.")
+    if res["proveedor"]:
+        prov = res["proveedor"]
+        if prov["cgnat"]:
+            res["cgnat"] = True
+        res["conclusiones"].insert(0, f"El speedtest de {prov['proveedor']} ve a tu router con la IP "
+                                      f"{prov['ip']}" + (" (CGNAT confirmado)." if prov["cgnat"] else "."))
     res["exposicion"], res["hallazgos"] = "", []
     if res["ip_publica"]:
         info = consultar_internetdb(res["ip_publica"])

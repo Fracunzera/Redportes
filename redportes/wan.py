@@ -116,6 +116,14 @@ def describir(ip: str, metodo: str) -> dict:
             "texto": textos.get(tipo, f"El router informa la IP WAN {ip}.")}
 
 
+def origen(w: dict) -> str:
+    """De dónde salió la IP WAN, en castellano."""
+    m = w.get("metodo", "")
+    if m.startswith("speedtest"):
+        return f"según el {m}"
+    return f"informada por el router vía {m}" if m else ""
+
+
 def ip_wan(puerta: str, ubicaciones_igd: list[str]) -> dict:
     """{'ip', 'metodo' (UPnP | NAT-PMP), 'tipo' (cgnat | privada | publica), 'texto'}."""
     ip = por_upnp(ubicaciones_igd) if ubicaciones_igd else ""

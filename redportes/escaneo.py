@@ -168,7 +168,7 @@ def parte_internet(ctl: Control, puerta: str, igd: dict | None, con_internet: bo
                                                         "Usá la pestaña Diagnóstico para repetirla."))
         if salida and salida.get("proveedor") and not datos_wan.get("ip"):
             prov = salida["proveedor"]
-            datos_wan = wan.describir(prov["ip"], f"el servidor de {prov['proveedor']}")
+            datos_wan = wan.describir(prov["ip"], f"speedtest de {prov['proveedor']}")
     return {"wan": datos_wan, "internet": salida, "diagnostico": diag,
             "dns": describir_dns(servidores_dns(), puerta)}
 
@@ -189,7 +189,9 @@ def texto_internet(r: dict) -> str:
     lineas = []
     w = r.get("wan") or {}
     if w.get("ip"):
-        lineas.append(f"IP WAN del router: {w['ip']} (vía {w['metodo']})")
+        from redportes.wan import origen
+
+        lineas.append(f"IP WAN del router: {w['ip']} ({origen(w)})")
     if w.get("texto"):
         lineas += [w["texto"], ""]
     inet = r.get("internet")
