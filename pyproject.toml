@@ -8,6 +8,7 @@ dynamic = ["version"]
 description = "Escáner de red local para técnicos de campo: mapa, qué hay conectado, qué revisar e informe para PDF."
 readme = "README.md"
 license = { text = "MIT" }
+authors = [{ name = "Fracunzera" }]
 requires-python = ">=3.9"
 dependencies = ["psutil>=5.8"]
 keywords = ["redes", "escaner", "nmap", "sysadmin", "inventario", "auditoria"]

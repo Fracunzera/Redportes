@@ -25,6 +25,10 @@
 </p>
 
 <p align="center">
+  Hecho por <a href="https://github.com/Fracunzera"><b>Fracunzera</b></a>
+</p>
+
+<p align="center">
   <sub>Gratis y de código abierto (MIT) · Windows 10/11 · Linux (AppImage) · macOS con pip ·
   <a href="https://github.com/Fracunzera/Redportes/releases">versiones anteriores</a> ·
   <a href="https://redportes.blucaro.site">sitio web</a></sub>

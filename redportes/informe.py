@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from html import escape
 
-from redportes import __version__
+from redportes import AUTOR_URL, SITIO, __autor__, __version__
 from redportes.escaneo import todos_los_hallazgos
 
 COLORES = {
@@ -405,7 +405,8 @@ amarillo bajo. Pasá el mouse por encima para ver el detalle.</p></section>
 
     puertos_rev = r.get("puertos_revisados") or []
     partes.append(f"""<footer>
-<p>Generado con Redportes {__version__}. Puertos TCP revisados: {len(puertos_rev)}
+<p class="firma">Generado con <a href="{SITIO}">Redportes</a> {__version__} · hecho por <a href="{AUTOR_URL}">{__autor__}</a></p>
+<p>Puertos TCP revisados: {len(puertos_rev)}
 {'(con nmap)' if r.get('nmap') else '(sin nmap)'}{'' if r.get('admin') else ' · sin permisos de administrador'}.</p>
 <p>Redportes no instala agentes, no prueba contraseñas, no cambia nada en los equipos y no envía
 datos a Internet salvo que se use <code>--internet</code>. Es una foto del momento: un equipo apagado
@@ -464,6 +465,7 @@ th,td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid
 th{background:#f8fafc;font-weight:600}
 tr{break-inside:avoid}
 .mono,code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.firma{font-size:13px;color:#334155}.firma a{color:#2563eb;text-decoration:none}
 footer{margin-top:36px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b}
 @media (max-width:700px){.tarjetas{grid-template-columns:repeat(2,1fr)}header{flex-direction:column}}
 @media print{.no-print{display:none}body{padding:0;max-width:none}.mapa svg{min-width:0}

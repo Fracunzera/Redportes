@@ -2,6 +2,9 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.12.0] - 2026-11-04
+- Firma «hecho por Fracunzera» en los informes (también el mensual y el de compartir), en la ventana, en «Acerca de», en los avisos de Telegram, en `redportes --version`, en el sitio y en el README.
+
 ## [0.11.0] - 2026-11-04
 - **Detener y Reiniciar** mientras escanea: corta todo al instante, incluido nmap.
 - **Nada puede trabar el escaneo:** cada etapa tiene un tiempo máximo. Si se pasa, sigue con lo demás y deja un aviso con qué hacer (en pantalla, en el registro y en el informe, en «Durante el escaneo»).

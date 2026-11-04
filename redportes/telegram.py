@@ -141,4 +141,4 @@ def armar_aviso(r: dict, cambios: dict | None, previo: dict | None) -> str:
     if not partes:
         return ""
     cab = f"🛰 <b>Redportes</b> · {e(r.get('cliente') or 'Red')} ({e(r['red'])})"
-    return cab + "\n\n" + "\n\n".join(partes)
+    return cab + "\n\n" + "\n\n".join(partes) + "\n\n<i>Redportes · hecho por Fracunzera</i>"

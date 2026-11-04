@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from redportes import __version__, salud, visitas
+from redportes import AUTOR_URL, SITIO, __autor__, __version__, salud, visitas
 from redportes.informe import CSS, NIVEL_COLOR, NIVEL_TEXTO, _e
 from redportes.modelo import equipo_desde_dict
 
@@ -204,7 +204,7 @@ def generar(d: dict) -> str:
 <th>Cantidad</th></tr></thead><tbody>"""]
     p += [f"<tr><td>{_e(t)}</td><td>{n}</td></tr>" for t, n in d["tipos"].items()]
     p.append(f"""</tbody></table></div></section>
-<footer><p>Generado con Redportes {__version__} el {datetime.now():%d/%m/%Y %H:%M}. Compara la última visita
+<footer><p class="firma">Generado con <a href="{SITIO}">Redportes</a> {__version__} · hecho por <a href="{AUTOR_URL}">{__autor__}</a></p><p>Generado el {datetime.now():%d/%m/%Y %H:%M}. Compara la última visita
 del mes con la última visita anterior al mes.</p></footer></body></html>""")
     return "".join(p)
 

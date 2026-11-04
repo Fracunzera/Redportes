@@ -354,8 +354,11 @@ def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="redportes",
         description="Escáner de red local para técnicos: qué hay conectado, qué conviene revisar "
-                    "y un informe listo para PDF.")
-    p.add_argument("--version", action="version", version=f"redportes {__version__}")
+                    "y un informe listo para PDF. Hecho por Fracunzera.")
+    from redportes import __autor__
+
+    p.add_argument("--version", action="version",
+                   version=f"redportes {__version__} · hecho por {__autor__} · https://redportes.blucaro.site")
     sub = p.add_subparsers(dest="comando")
 
     e = sub.add_parser("escanear", help="escanea la red y genera el informe (comando por defecto)")

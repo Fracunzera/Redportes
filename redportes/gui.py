@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter import font as tkfont
 
-from redportes import __version__, escaneo, informe, visitas
+from redportes import SITIO, __autor__, __version__, escaneo, informe, visitas
 from redportes.escaneo import todos_los_hallazgos
 from redportes.puertos import lista_de_puertos
 from redportes.red import listar_interfaces
@@ -308,6 +308,7 @@ class App:
         messagebox.showinfo(
             "Acerca de Redportes",
             f"Redportes {__version__}" + (" (portable)" if es_portable() else "") + "\n"
+            f"Hecho por {__autor__}.\n"
             "Escáner de red gratis y de código abierto (licencia MIT).\n\n"
             "https://redportes.blucaro.site\nhttps://github.com/Fracunzera/Redportes\n\n"
             f"Datos e historial: {carpeta_datos()}\nInformes: {carpeta_informes()}")
@@ -505,7 +506,11 @@ class App:
         self.nb.add(p5, text="Registro")
 
     def _armar_pie(self):
-        pie = ttk.Frame(self.raiz, padding=12)
+        firma = tk.Label(self.raiz, text=f"Redportes {__version__} · hecho por {__autor__}", fg="#94a3b8",
+                         cursor="hand2", font=("TkDefaultFont", 8))
+        firma.pack(side="bottom", anchor="e", padx=12)
+        firma.bind("<Button-1>", lambda _e: webbrowser.open(SITIO))
+        pie = ttk.Frame(self.raiz, padding=(12, 12, 12, 2))
         pie.pack(fill="x", side="bottom")
         self.b_informe = ttk.Button(pie, text="Abrir informe", command=self.abrir_informe,
                                     state="disabled")
