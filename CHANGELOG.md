@@ -2,6 +2,11 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.8.0] - 2026-11-03
+- **¿No abre una página?** En la pestaña Diagnóstico pegás la dirección y Redportes prueba en orden: si anda Internet, el DNS (compara los de la PC con Cloudflare, Google, Quad9 y OpenDNS), el archivo hosts, la conexión al sitio, HTTPS y certificado, la respuesta del sitio y el MTU. Se frena en la primera que falla y lo explica en una frase, con qué hacer.
+- Detecta caché DNS vieja (y cuánto le queda), bloqueos de AdGuard/Pi-hole, proxies que interceptan HTTPS, certificados vencidos, sitios caídos y MTU bajo (con el comando para MikroTik y Windows).
+- En la consola: `redportes pagina <dirección>` y `redportes dns <dirección>`.
+
 ## [0.7.0] - 2026-11-03
 - **Aviso de versión nueva:** al abrir, Redportes consulta GitHub (como mucho una vez por día, si aceptaste) y muestra un aviso con el botón para descargar.
 - **Informe para compartir:** una copia del informe con las IPs, MACs y nombres tapados, para publicar capturas o pedir ayuda sin exponer la red. Botón en la ventana, o `--compartir` en la consola.

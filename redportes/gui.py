@@ -97,8 +97,8 @@ class App:
         self.b_bajar.pack(side="right", padx=4, pady=4)
 
         self._armar_formulario()
+        self._armar_pie()        # se empaqueta antes que las pestañas para que siempre quede visible
         self._armar_pestanas()
-        self._armar_pie()
         self._cargar_interfaces()
         self._cargar_visitas()
         self._actualizar_cb_avisar()
@@ -202,23 +202,43 @@ class App:
         self.txt_internet.pack(fill="both", expand=True)
         self.nb.add(p3, text="Internet")
 
-        p6 = ttk.Frame(self.nb, padding=6)
-        barra = ttk.Frame(p6)
-        barra.pack(fill="x", pady=(0, 6))
-        self.b_diag = ttk.Button(barra, text="Probar conexión", style="Accion.TButton",
+        p6 = ttk.Frame(self.nb, padding=8)
+        fila1 = ttk.Frame(p6)
+        fila1.pack(fill="x")
+        self.b_diag = ttk.Button(fila1, text="Probar mi conexión", style="Accion.TButton",
                                  command=self.diagnosticar)
         self.b_diag.pack(side="left")
-        self.b_copiar_diag = ttk.Button(barra, text="Copiar resultado", command=self.copiar_diagnostico,
-                                        state="disabled")
-        self.b_copiar_diag.pack(side="left", padx=6)
-        ttk.Label(barra, text="Ping al router y a Internet, DNS y navegación. Tarda unos 15 segundos.",
-                  foreground="#64748b").pack(side="left", padx=8)
-        self.t_diag = self._tabla(p6, {"Prueba": 280, "Resultado": 560})
-        for est, color in (("ok", "#dcfce7"), ("aviso", "#fef9c3"), ("falla", "#fde2e2")):
+        ttk.Label(fila1, text="¿Anda bien Internet acá? Prueba el router, Internet, el DNS y la navegación.",
+                  foreground="#64748b").pack(side="left", padx=10)
+
+        caja = ttk.LabelFrame(p6, text=" ¿No abre una página? ", padding=8)
+        caja.pack(fill="x", pady=(10, 0))
+        ttk.Label(caja, text="Pegá la dirección:").pack(side="left")
+        self.v_pagina = tk.StringVar()
+        e_pag = ttk.Entry(caja, textvariable=self.v_pagina)
+        e_pag.pack(side="left", fill="x", expand=True, padx=6)
+        e_pag.bind("<Return>", lambda _e: self.averiguar_pagina())
+        self.b_pagina = ttk.Button(caja, text="Averiguar por qué", style="Accion.TButton",
+                                   command=self.averiguar_pagina)
+        self.b_pagina.pack(side="left")
+
+        self.l_veredicto = tk.Label(p6, text="Elegí una de las dos pruebas.", anchor="w", justify="left",
+                                    font=("TkDefaultFont", 12, "bold"), background="#e2e8f0", foreground="#0f172a",
+                                    padx=12, pady=10, wraplength=900)
+        self.l_veredicto.pack(fill="x", pady=(12, 0))
+        self.txt_hacer = tk.Text(p6, height=4, wrap="word", relief="flat", padx=12, pady=6,
+                                 background="#f8fafc", font="TkDefaultFont")
+        self.txt_hacer.pack(fill="x")
+        self.t_diag = self._tabla(p6, {"Prueba": 260, "Resultado": 600})
+        for est, color in (("ok", "#dcfce7"), ("aviso", "#fef9c3"), ("falla", "#fde2e2"),
+                           ("omitido", "#ffffff"), ("info", "#f1f5f9")):
             self.t_diag.tag_configure(est, background=color)
-        self.txt_diag = tk.Text(p6, height=6, wrap="word", relief="flat", padx=8, pady=6,
-                                background="#f8fafc", font="TkDefaultFont")
-        self.txt_diag.pack(fill="x", pady=(6, 0))
+        self.t_diag.tag_configure("omitido", foreground="#94a3b8")
+        self.t_diag.configure(height=7)
+        self.b_copiar_diag = ttk.Button(caja, text="Copiar resultado", command=self.copiar_resultado,
+                                        state="disabled")
+        self.b_copiar_diag.pack(side="left", padx=(6, 0))
+        self.texto_resultado = ""
         self.diag: dict | None = None
         self.nb.add(p6, text="Diagnóstico")
 
@@ -264,11 +284,11 @@ class App:
 
     def _armar_pie(self):
         pie = ttk.Frame(self.raiz, padding=12)
-        pie.pack(fill="x")
+        pie.pack(fill="x", side="bottom")
         self.b_informe = ttk.Button(pie, text="Abrir informe", command=self.abrir_informe,
                                     state="disabled")
         self.b_informe.pack(side="left")
-        self.b_guardar = ttk.Button(pie, text="Guardar informe como…", command=self.guardar_como,
+        self.b_guardar = ttk.Button(pie, text="Guardar como…", command=self.guardar_como,
                                     state="disabled")
         self.b_guardar.pack(side="left", padx=6)
         self.b_compartir = ttk.Button(pie, text="Informe para compartir", command=self.informe_compartir,
@@ -390,6 +410,8 @@ class App:
                     self._mostrar_nueva(dato)
                 elif tipo == "local":
                     self._mostrar_equipo_local(dato)
+                elif tipo == "pagina":
+                    self._mostrar_pagina(dato)
                 elif tipo == "diag":
                     self._mostrar_diagnostico(dato)
                 elif tipo == "oui":
@@ -652,14 +674,36 @@ class App:
 
     # ------------------------------------------------------------ diagnóstico
 
+    def _ocupado(self, si: bool):
+        estado = "disabled" if si else "normal"
+        self.b_diag.configure(state=estado)
+        self.b_pagina.configure(state=estado)
+        if si:
+            self.barra.start(12)
+        else:
+            self.barra.stop()
+            self.barra["value"] = 0
+
+    def _resultado(self, estado: str, veredicto: str, que_hacer: list[str], pasos: list[tuple], texto: str):
+        colores = {"ok": ("#dcfce7", "#14532d"), "aviso": ("#fef9c3", "#713f12"), "falla": ("#fde2e2", "#7f1d1d")}
+        fondo, letra = colores.get(estado, ("#e2e8f0", "#0f172a"))
+        icono = {"ok": "✔  ", "aviso": "⚠  ", "falla": "✖  "}.get(estado, "")
+        self.l_veredicto.configure(text=icono + veredicto, background=fondo, foreground=letra)
+        self.txt_hacer.delete("1.0", "end")
+        self.txt_hacer.insert("end", "\n".join(f"• {q}" for q in que_hacer))
+        self.t_diag.delete(*self.t_diag.get_children())
+        marca = {"ok": "✔", "aviso": "⚠", "falla": "✖", "omitido": "·", "info": "ℹ"}
+        for nombre, est, detalle in pasos:
+            self.t_diag.insert("", "end", values=(f"{marca.get(est, '')} {nombre}", detalle), tags=(est,))
+        self.texto_resultado = texto
+        self.b_copiar_diag.configure(state="normal")
+
     def diagnosticar(self):
         from redportes import diagnostico
 
-        self.b_diag.configure(state="disabled")
-        self.t_diag.delete(*self.t_diag.get_children())
-        self.txt_diag.delete("1.0", "end")
-        self.txt_diag.insert("end", "Probando… (unos 15 segundos)")
-        self.barra.start(12)
+        self._ocupado(True)
+        self.l_veredicto.configure(text="Probando la conexión… (unos 15 segundos)", background="#e2e8f0",
+                                   foreground="#0f172a")
 
         def trabajo():
             try:
@@ -672,30 +716,55 @@ class App:
     def _mostrar_diagnostico(self, d: dict):
         from redportes import diagnostico
 
-        self.barra.stop()
-        self.barra["value"] = 0
-        self.b_diag.configure(state="normal")
-        self.txt_diag.delete("1.0", "end")
+        self._ocupado(False)
         if "error" in d:
-            self.txt_diag.insert("end", f"No se pudo hacer el diagnóstico: {d['error']}")
+            self._resultado("falla", f"No se pudo hacer la prueba: {d['error']}", [], [], "")
             return
         self.diag = d
-        for p in d["pruebas"]:
-            self.t_diag.insert("", "end", values=(f"{diagnostico.ICONO[p['estado']]} {p['nombre']}",
-                                                  p["resultado"]), tags=(p["estado"],))
-        self.txt_diag.insert("end", "\n".join(f"• {c}" for c in d["conclusiones"]))
-        self.b_copiar_diag.configure(state="normal")
-        fallas = sum(1 for p in d["pruebas"] if p["estado"] == "falla")
-        avisos = sum(1 for p in d["pruebas"] if p["estado"] == "aviso")
-        self.v_estado.set(f"Diagnóstico listo: {fallas} fallas, {avisos} avisos." if fallas or avisos
-                          else "Diagnóstico listo: todo bien.")
+        estados = [p["estado"] for p in d["pruebas"]]
+        estado = "falla" if "falla" in estados else "aviso" if "aviso" in estados else "ok"
+        concl = d["conclusiones"]
+        self._resultado(estado, concl[0], concl[1:],
+                        [(p["nombre"], p["estado"], p["resultado"]) for p in d["pruebas"]],
+                        diagnostico.como_texto(d))
+        self.v_estado.set("Prueba de conexión terminada.")
 
-    def copiar_diagnostico(self):
-        from redportes import diagnostico
+    def averiguar_pagina(self):
+        from redportes import consulta_dns, pagina
 
-        if self.diag:
+        texto = self.v_pagina.get()
+        if "." not in consulta_dns.limpiar(texto):
+            messagebox.showinfo("Redportes", "Pegá la dirección de la página que no abre, por ejemplo "
+                                "www.ejemplo.com.ar o https://www.ejemplo.com.ar/algo")
+            return
+        self._ocupado(True)
+        self.l_veredicto.configure(text=f"Averiguando por qué no abre {consulta_dns.limpiar(texto)}…",
+                                   background="#e2e8f0", foreground="#0f172a")
+
+        def trabajo():
+            try:
+                self.cola.put(("pagina", pagina.investigar(texto, lambda m: self.cola.put(("progreso", m)))))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("pagina", {"error": str(e)}))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_pagina(self, r: dict):
+        from redportes import pagina
+
+        self._ocupado(False)
+        if "error" in r:
+            self._resultado("falla", r["error"], [], [], "")
+            return
+        self.v_pagina.set(r["dominio"])
+        self._resultado(r["estado"], r["veredicto"], r["que_hacer"],
+                        [(p["nombre"], p["estado"], p["detalle"]) for p in r["pasos"]], pagina.como_texto(r))
+        self.v_estado.set(f"Listo: {r['dominio']}.")
+
+    def copiar_resultado(self):
+        if self.texto_resultado:
             self.raiz.clipboard_clear()
-            self.raiz.clipboard_append(diagnostico.como_texto(self.diag))
+            self.raiz.clipboard_append(self.texto_resultado)
             self.v_estado.set("Resultado copiado: pegalo en WhatsApp, Telegram o en el ticket.")
 
     # ------------------------------------------------------------ al abrir
