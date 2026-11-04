@@ -310,14 +310,18 @@ def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
     return None
 
 
-def revisar(puerta: str, cgnat_wan: bool = False, urls_proveedor: list[str] | None = None) -> dict:
+def revisar(puerta: str, cgnat_wan: bool = False, urls_proveedor: list[str] | None = None,
+            parar=None) -> dict:
     cmd = comando_traza()
     if cmd is None:
         res = analizar_saltos([], puerta)
         res["conclusiones"] = ["No se encontró traceroute/tracepath en este equipo; "
                                "instalalo para analizar la salida a Internet."]
     else:
-        res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=120)), puerta)
+        res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=120, cancelado=parar)), puerta)
+    if parar and parar():
+        res.update(ip_publica="", proveedor=None, exposicion="", hallazgos=[])
+        return res
     res["ip_publica"] = ip_publica()
     conocidos = proveedores_del_camino(res["saltos"], res["ip_publica"])
     res["proveedor"] = (ip_vista_por_proveedor(urls_proveedor, proveedores=conocidos)

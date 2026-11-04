@@ -142,6 +142,7 @@ redportes inventario -c "Oficina" -o inventario.csv
 redportes diagnostico                          # ¿anda mal la red, el proveedor o el DNS?
 redportes pagina https://www.ejemplo.com       # ¿por qué no abre esta página?
 redportes equipo                               # configuración de esta computadora
+redportes internet                             # solo la salida a Internet (sin escanear la red)
 ```
 
 ## Redes grandes

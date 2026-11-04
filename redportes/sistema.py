@@ -62,29 +62,50 @@ def entorno_sistema() -> dict | None:
 _preparar_entorno()
 
 
-def ejecutar(cmd: list[str], timeout: float = 10, encoding: str | None = None) -> str:
-    """Ejecuta un comando y devuelve su salida estándar (vacía si falla).
+def ejecutar_detallado(cmd: list[str], timeout: float = 10, encoding: str | None = None,
+                       cancelado=None) -> tuple[str, str]:
+    """Ejecuta un comando. Devuelve (salida, estado) con estado 'ok', 'tiempo', 'cancelado' o 'error'.
 
+    - stdin vacío: en el ejecutable de Windows (sin consola) algunos programas, como nmap,
+      se quedaban esperando una entrada que nunca llega.
+    - Se puede cortar en cualquier momento con `cancelado()`.
     En Windows, los comandos de consola (netsh, ipconfig) escriben en la página de códigos OEM:
     con encoding="oem" se leen bien los acentos («Señal», «Autenticación»).
     """
     if encoding == "oem" and not ES_WINDOWS:
         encoding = None
     try:
-        r = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            encoding=encoding,
-            errors="replace",
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding=encoding, errors="replace",
             # En Windows evita que se abra una ventana de consola por cada ping.
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             env=entorno_sistema(),
         )
-        return r.stdout or ""
-    except (OSError, subprocess.SubprocessError):
-        return ""
+    except OSError:
+        return "", "error"
+    import time
+
+    fin = time.monotonic() + timeout
+    while True:
+        try:
+            salida, _ = proc.communicate(timeout=0.3)
+            return salida or "", "ok"
+        except subprocess.TimeoutExpired:
+            pass
+        estado = "cancelado" if cancelado and cancelado() else "tiempo" if time.monotonic() > fin else ""
+        if estado:
+            proc.kill()
+            try:
+                salida, _ = proc.communicate(timeout=3)
+            except subprocess.SubprocessError:
+                salida = ""
+            return salida or "", estado
+
+
+def ejecutar(cmd: list[str], timeout: float = 10, encoding: str | None = None, cancelado=None) -> str:
+    """Ejecuta un comando y devuelve su salida estándar (vacía si falla)."""
+    return ejecutar_detallado(cmd, timeout, encoding, cancelado)[0]
 
 
 def es_admin() -> bool:

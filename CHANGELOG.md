@@ -2,6 +2,15 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.11.0] - 2026-11-04
+- **Detener y Reiniciar** mientras escanea: corta todo al instante, incluido nmap.
+- **Nada puede trabar el escaneo:** cada etapa tiene un tiempo máximo. Si se pasa, sigue con lo demás y deja un aviso con qué hacer (en pantalla, en el registro y en el informe, en «Durante el escaneo»).
+- **nmap en Windows:** se quedaba esperando una entrada que nunca llegaba y resolvía nombres de más; ahora corre sin entrada, sin resolver nombres y con límite de tiempo. Si no responde, se sigue con la búsqueda propia y te recomienda revisar Npcap o desactivarlo.
+- **Herramientas → Usar nmap** para prenderlo o apagarlo.
+- **Equipos con firewall:** si un equipo no contesta en la mayoría de los puertos, el aviso lo nombra y sugiere revisarlo con puertos específicos.
+- **Probar solo Internet** (pestaña Internet, o `redportes internet`): IP WAN, CGNAT, traceroute, IP pública, qué se ve desde afuera y prueba de conexión, sin escanear la red local.
+- Se ve el tiempo de cada etapa mientras avanza.
+
 ## [0.10.0] - 2026-11-04
 - **Actualizar desde la app:** «Actualizar ahora» (en el aviso o en Ayuda → Buscar actualizaciones) baja la versión que corresponde a tu sistema, la instala y vuelve a abrir Redportes, sin pasar por GitHub.
   - Linux (AppImage): reemplaza el archivo y se reinicia.

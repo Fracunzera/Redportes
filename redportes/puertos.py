@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import http.client
 import re
 import socket
@@ -54,15 +55,25 @@ def lista_de_puertos(spec: str) -> list[int]:
     return sorted(res)
 
 
-def puerto_abierto(ip: str, puerto: int, timeout: float = 0.8) -> bool:
+def estado_puerto(ip: str, puerto: int, timeout: float = 0.8) -> str:
+    """'abierto', 'cerrado' (el equipo contesta que no) o 'filtrado' (no contesta: firewall)."""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)
     try:
-        return s.connect_ex((ip, puerto)) == 0
+        r = s.connect_ex((ip, puerto))
     except OSError:
-        return False
+        return "filtrado"
     finally:
         s.close()
+    if r == 0:
+        return "abierto"
+    if r in (errno.ECONNREFUSED, 10061):
+        return "cerrado"
+    return "filtrado"
+
+
+def puerto_abierto(ip: str, puerto: int, timeout: float = 0.8) -> bool:
+    return estado_puerto(ip, puerto, timeout) == "abierto"
 
 
 def leer_banner(ip: str, puerto: int, timeout: float = 2.5) -> str:
@@ -164,19 +175,49 @@ def acepta_smbv1(ip: str, timeout: float = 3) -> bool:
 
 # ---------------------------------------------------------------- todo junto
 
-def escanear(ips: list[str], puertos: list[int], progreso=lambda m: None) -> dict[str, list[Puerto]]:
+def escanear(ips: list[str], puertos: list[int], progreso=lambda m: None, parar=lambda: False,
+             avisar=lambda texto, recomendacion="": None, limite_detalle: float = 45) -> dict[str, list[Puerto]]:
+    from concurrent.futures import FIRST_COMPLETED, wait as esperar
+
     res: dict[str, list[Puerto]] = {ip: [] for ip in ips}
     if not puertos or not ips:
         return res
     pares = [(ip, p) for ip in ips for p in puertos]
     progreso(f"Revisando {len(puertos)} puertos en {len(ips)} equipos…")
     abiertos = []
-    with ThreadPoolExecutor(max_workers=400) as ex:
-        for n, (par, ok) in enumerate(zip(pares, ex.map(lambda x: puerto_abierto(*x), pares)), 1):
-            if ok:
-                abiertos.append(par)
-            if len(pares) > 20000 and n % (len(pares) // 10) == 0:
-                progreso(f"Puertos: {n}/{len(pares)} pruebas, {len(abiertos)} abiertos…")
+    filtrados: dict[str, int] = {}
+    ex = ThreadPoolExecutor(max_workers=400)
+    futuros = {ex.submit(estado_puerto, ip, p): (ip, p) for ip, p in pares}
+    pendientes = set(futuros)
+    hechos_total = 0
+    try:
+        while pendientes:
+            hechos, pendientes = esperar(pendientes, timeout=0.3, return_when=FIRST_COMPLETED)
+            for f in hechos:
+                ip, p = futuros[f]
+                estado = f.result()
+                if estado == "abierto":
+                    abiertos.append((ip, p))
+                elif estado == "filtrado":
+                    filtrados[ip] = filtrados.get(ip, 0) + 1
+            hechos_total += len(hechos)
+            if len(pares) > 20000 and hechos and hechos_total % max(1, len(pares) // 10) < len(hechos):
+                progreso(f"Puertos: {hechos_total}/{len(pares)} pruebas, {len(abiertos)} abiertos…")
+            if parar():
+                avisar(f"La revisión de puertos se cortó antes de terminar ({hechos_total} de {len(pares)} pruebas).",
+                       "Los resultados de puertos pueden estar incompletos. Para un equipo puntual, escaneá "
+                       "solo su IP (campo Red) o puertos específicos.")
+                break
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+
+    # Equipos que no contestan en la mayoría de los puertos: tienen firewall y hacen esperar cada prueba.
+    con_firewall = [ip for ip, n in filtrados.items() if len(puertos) >= 5 and n >= 0.6 * len(puertos)]
+    if con_firewall and len(con_firewall) <= 20:
+        avisar(f"{len(con_firewall)} equipo(s) no contestan en la mayoría de los puertos (firewall): "
+               + ", ".join(con_firewall[:8]) + ("…" if len(con_firewall) > 8 else "") + ".",
+               "Puede haber servicios que no se vieron. Si tenés que revisar alguno, escaneá esa IP con "
+               "los puertos que te interesan (por ejemplo 22,80,443,3389).")
 
     def detalle(par):
         ip, p = par
@@ -187,11 +228,35 @@ def escanear(ips: list[str], puertos: list[int], progreso=lambda m: None) -> dic
             pu.banner = leer_banner(ip, p)
         return ip, pu
 
-    if abiertos:
+    if abiertos and not parar():
         progreso(f"Identificando {len(abiertos)} servicios abiertos…")
-    with ThreadPoolExecutor(max_workers=32) as ex:
-        for ip, pu in ex.map(detalle, abiertos):
-            res[ip].append(pu)
+        ex = ThreadPoolExecutor(max_workers=32)
+        futuros = {ex.submit(detalle, par): par for par in abiertos}
+        pendientes = set(futuros)
+        import time
+
+        fin = time.monotonic() + limite_detalle
+        try:
+            while pendientes and time.monotonic() < fin and not parar():
+                hechos, pendientes = esperar(pendientes, timeout=0.3, return_when=FIRST_COMPLETED)
+                for f in hechos:
+                    try:
+                        ip, pu = f.result()
+                        res[ip].append(pu)
+                    except Exception:  # noqa: BLE001
+                        pass
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
+        # Lo que no llegó a identificarse queda igual como puerto abierto, sin título.
+        for f in pendientes:
+            ip, p = futuros[f]
+            res[ip].append(Puerto(numero=p, servicio=SERVICIOS.get(p, "")))
+        if pendientes:
+            avisar(f"{len(pendientes)} servicio(s) tardaron demasiado en responder y no se identificaron.",
+                   "Suelen ser paneles web lentos o equipos saturados. Abrilos a mano para ver qué son.")
+    elif abiertos:
+        for ip, p in abiertos:
+            res[ip].append(Puerto(numero=p, servicio=SERVICIOS.get(p, "")))
     for lista in res.values():
         lista.sort(key=lambda p: p.numero)
     return res

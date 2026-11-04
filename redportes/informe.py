@@ -211,6 +211,15 @@ def _comandos(lista, nombres) -> str:
     return "".join(res)
 
 
+def _bloque_avisos(r: dict) -> str:
+    avisos = r.get("avisos") or []
+    if not avisos:
+        return ""
+    items = "".join(f"<li><b>{_e(a['texto'])}</b>" + (f"<br><span class='gris'>{_e(a['recomendacion'])}</span>"
+                                                     if a.get("recomendacion") else "") + "</li>" for a in avisos)
+    return f'<section class="avisos"><h2>Durante el escaneo</h2><ul>{items}</ul></section>'
+
+
 def _bloque_salud(r: dict) -> str:
     from redportes import salud
 
@@ -258,6 +267,7 @@ const s=getSelection();s.removeAllRanges();s.addRange(r)}})}}</script></head><bo
   {_tarjeta(cuenta['medio'], 'hallazgos medios', NIVEL_COLOR['medio'])}
   {_tarjeta(r.get('puerta') or '—', 'puerta de enlace' + (f" · WAN {(r.get('wan') or {}).get('ip')}" if (r.get('wan') or {}).get('ip') else ''))}
 </section>
+{_bloque_avisos(r)}
 <section><h2>Mapa</h2><div class="mapa">{mapa_svg(r)}</div>
 {_leyenda(r)}
 {'<p class="nota">Hay demasiados equipos para dibujarlos uno por uno: el mapa los agrupa por subred /24.</p>' if len(r['equipos']) > MAX_NODOS + 1 else ''}
@@ -416,6 +426,8 @@ h2{font-size:18px;margin:30px 0 10px;border-bottom:1px solid #e2e8f0;padding-bot
 h3{font-size:14px;margin:14px 0 4px}
 .meta,.gris,.nota{color:#64748b}.nota{font-size:13px}
 button{background:#0f172a;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+.avisos ul{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px 10px 30px;margin:0}
+.avisos li{margin:4px 0}
 .compartible{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;margin:16px 0 0;font-size:14px}
 .salud{display:flex;gap:18px;align-items:center;margin-top:20px;border:1px solid #e2e8f0;
   border-radius:10px;padding:14px 18px}

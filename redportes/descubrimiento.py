@@ -138,9 +138,13 @@ def parsear_nmap_xml(texto: str) -> list[Equipo]:
     return equipos
 
 
-def descubrir_con_nmap(red: str) -> list[Equipo]:
-    salida = ejecutar(["nmap", "-sn", "-T4", "-oX", "-", red], timeout=300)
-    return parsear_nmap_xml(salida)
+def descubrir_con_nmap(red: str, limite: float = 120, parar=None) -> tuple[list[Equipo], str]:
+    """(equipos, estado). -n: sin resolver nombres (lo hacemos aparte y es lo que más demoraba)."""
+    from redportes.sistema import ejecutar_detallado
+
+    salida, estado = ejecutar_detallado(["nmap", "-sn", "-n", "-T4", "--max-retries", "1", "-oX", "-", red],
+                                        timeout=limite, cancelado=parar)
+    return parsear_nmap_xml(salida), estado
 
 
 # ---------------------------------------------------------------- nombres
@@ -166,7 +170,31 @@ def resolver_nombres(ips: list[str], tiempo_max: float = 8) -> dict[str, str]:
 
 # ---------------------------------------------------------------- todo junto
 
-def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None) -> dict[str, Equipo]:
+def _mapa_cortable(func, items, workers, parar):
+    """Como ex.map, pero deja de esperar apenas parar() es True. Devuelve pares (item, resultado)."""
+    from concurrent.futures import FIRST_COMPLETED, wait as esperar
+
+    ex = ThreadPoolExecutor(max_workers=workers)
+    futuros = {ex.submit(func, it): it for it in items}
+    pendientes = set(futuros)
+    res = []
+    try:
+        while pendientes:
+            hechos, pendientes = esperar(pendientes, timeout=0.3, return_when=FIRST_COMPLETED)
+            for f in hechos:
+                try:
+                    res.append((futuros[f], f.result()))
+                except Exception:  # noqa: BLE001
+                    pass
+            if parar and parar():
+                break
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+    return res
+
+
+def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None, parar=lambda: False,
+              avisar=lambda texto, recomendacion="": None) -> dict[str, Equipo]:
     redip = ipaddress.IPv4Network(red, strict=False)
     hosts = [str(h) for h in redip.hosts()]
     equipos: dict[str, Equipo] = {}
@@ -177,18 +205,28 @@ def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None) -> dict
         return equipos[ip]
 
     if usar_nmap and tiene("nmap"):
+        limite = min(240, 30 + len(hosts) * 0.05)
         progreso("Buscando equipos con nmap…")
-        for e in descubrir_con_nmap(red):
+        encontrados, estado = descubrir_con_nmap(red, limite, parar)
+        for e in encontrados:
             equipos[e.ip] = e
+        if estado == "tiempo":
+            avisar(f"nmap no terminó en {int(limite)} s: se siguió con la búsqueda propia de Redportes.",
+                   "Revisá que Npcap esté instalado y actualizado (viene con nmap). Si en esta PC nmap "
+                   "sigue trabándose, desactivalo en Herramientas → Usar nmap.")
+        elif estado == "ok" and not encontrados:
+            avisar("nmap no devolvió ningún equipo: se siguió con la búsqueda propia.",
+                   "Puede faltar Npcap o permisos. Redportes funciona igual sin nmap.")
+    if parar():
+        return equipos
 
     from redportes import icmp
 
     progreso(f"Ping a {len(hosts)} direcciones…")
-    respuestas = icmp.barrido(hosts, timeout=1.0, progreso=progreso)
+    respuestas = icmp.barrido(hosts, timeout=1.0, progreso=progreso, parar=parar)
     if respuestas is None and tiene("ping"):
         # Sin socket ICMP disponible: un proceso `ping` por dirección (lento en redes grandes).
-        with ThreadPoolExecutor(max_workers=128) as ex:
-            respuestas = {ip: r for ip, r in zip(hosts, ex.map(hacer_ping, hosts)) if r[0] is not None}
+        respuestas = {ip: r for ip, r in _mapa_cortable(hacer_ping, hosts, 128, parar) if r[0] is not None}
     respuestas = respuestas or {}
     for ip, (ttl, lat) in respuestas.items():
         e = equipo(ip)
@@ -198,12 +236,11 @@ def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None) -> dict
     # Equipos que bloquean el ping (Windows con firewall, por ejemplo): un toque TCP.
     # Solo en redes chicas; en las grandes sería demasiado lento.
     sin_respuesta = [ip for ip in hosts if ip not in equipos]
-    if sin_respuesta and len(hosts) <= TOQUE_TCP_MAX:
+    if sin_respuesta and len(hosts) <= TOQUE_TCP_MAX and not parar():
         progreso(f"Toque TCP a {len(sin_respuesta)} direcciones que no respondieron ping…")
-        with ThreadPoolExecutor(max_workers=256) as ex:
-            for ip, vivo in zip(sin_respuesta, ex.map(toque_tcp, sin_respuesta)):
-                if vivo:
-                    equipo(ip).marcar("TCP")
+        for ip, vivo in _mapa_cortable(toque_tcp, sin_respuesta, 256, parar):
+            if vivo:
+                equipo(ip).marcar("TCP")
 
     # La tabla ARP trae MACs y equipos que no contestan ping ni TCP.
     for ip, mac in tabla_arp().items():
@@ -217,8 +254,9 @@ def descubrir(red: str, usar_nmap: bool = True, progreso=lambda m: None) -> dict
             e.mac = mac
         e.marcar("ARP")
 
-    progreso("Resolviendo nombres…")
-    for ip, nombre in resolver_nombres(list(equipos)).items():
-        if not equipos[ip].nombre:
-            equipos[ip].nombre = nombre
+    if not parar():
+        progreso("Resolviendo nombres…")
+        for ip, nombre in resolver_nombres(list(equipos)).items():
+            if not equipos[ip].nombre:
+                equipos[ip].nombre = nombre
     return equipos

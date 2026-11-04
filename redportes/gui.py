@@ -121,6 +121,9 @@ class App:
         herr = tk.Menu(barra, tearoff=0)
         herr.add_command(label="Automatizar (Telegram y escaneo diario)…", command=self.abrir_automatizar)
         herr.add_command(label="Exportar inventario (Excel)…", command=self.exportar_inventario)
+        self.v_usar_nmap = tk.BooleanVar(value=config.leer().get("usar_nmap", True))
+        herr.add_checkbutton(label="Usar nmap (si está instalado)", variable=self.v_usar_nmap,
+                             command=self._guardar_usar_nmap)
         herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
         herr.add_command(label="Página de mi proveedor que muestra la IP interna…", command=self.configurar_proveedor)
         herr.add_separator()
@@ -174,6 +177,14 @@ class App:
         cfg["url_proveedor"] = url.strip()
         config.guardar(cfg)
         self.v_estado.set("Página del proveedor guardada: se usa al escanear con «salida a Internet».")
+
+    def _guardar_usar_nmap(self):
+        from redportes import config
+
+        cfg = config.leer()
+        cfg["usar_nmap"] = self.v_usar_nmap.get()
+        config.guardar(cfg)
+        self.v_estado.set("nmap " + ("activado." if self.v_usar_nmap.get() else "desactivado: se usa la búsqueda propia."))
 
     def _cambiar_aviso_auto(self):
         from redportes import config
@@ -328,19 +339,26 @@ class App:
 
         opciones = ttk.Frame(f)
         opciones.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        # Los botones se empaquetan primero para que nunca se queden sin lugar.
+        acciones = ttk.Frame(opciones)
+        acciones.pack(side="right")
         self.v_internet = tk.BooleanVar(value=False)
         self.v_guardar = tk.BooleanVar(value=True)
-        ttk.Checkbutton(opciones, text="Analizar salida a Internet (traceroute e IP pública)",
+        ttk.Checkbutton(opciones, text="Analizar salida a Internet",
                         variable=self.v_internet).pack(side="left")
-        ttk.Checkbutton(opciones, text="Guardar en el historial de visitas",
-                        variable=self.v_guardar).pack(side="left", padx=18)
+        ttk.Checkbutton(opciones, text="Guardar en el historial",
+                        variable=self.v_guardar).pack(side="left", padx=14)
         self.v_avisar = tk.BooleanVar(value=False)
-        self.cb_avisar = ttk.Checkbutton(opciones, text="Avisar por Telegram si hay novedades",
+        self.cb_avisar = ttk.Checkbutton(opciones, text="Avisar por Telegram",
                                          variable=self.v_avisar)
         self.cb_avisar.pack(side="left")
-        self.b_escanear = ttk.Button(opciones, text="Escanear", style="Accion.TButton",
+        self.b_escanear = ttk.Button(acciones, text="Escanear", style="Accion.TButton",
                                      command=self.escanear)
         self.b_escanear.pack(side="right")
+        self.b_reiniciar = ttk.Button(acciones, text="Reiniciar", command=self.reiniciar)
+        self.b_detener = ttk.Button(acciones, text="Detener", style="Accion.TButton", command=self.detener)
+        self.control = None
+        self._reiniciar_pendiente = False
 
         estado = ttk.Frame(self.raiz, padding=(12, 0, 12, 6))
         estado.pack(fill="x")
@@ -392,6 +410,16 @@ class App:
         self.nb.add(p2, text="Para revisar")
 
         p3 = ttk.Frame(self.nb, padding=6)
+        barra3 = ttk.Frame(p3)
+        barra3.pack(fill="x", pady=(0, 6))
+        self.b_solo_inet = ttk.Button(barra3, text="Probar solo Internet", style="Accion.TButton",
+                                      command=self.probar_solo_internet)
+        self.b_solo_inet.pack(side="left")
+        self.b_det_inet = ttk.Button(barra3, text="Detener", command=self.detener, state="disabled")
+        self.b_det_inet.pack(side="left", padx=6)
+        ttk.Button(barra3, text="Copiar", command=self._copiar_internet).pack(side="left")
+        ttk.Label(barra3, text="IP WAN del router, CGNAT, traceroute, IP pública y conexión, sin escanear la red local.",
+                  foreground="#64748b").pack(side="left", padx=8)
         self.txt_internet = tk.Text(p3, wrap="word", relief="flat", padx=8, pady=6)
         self.txt_internet.pack(fill="both", expand=True)
         self.nb.add(p3, text="Internet")
@@ -553,21 +581,90 @@ class App:
                 return
             forzar = True
 
-        self.b_escanear.configure(state="disabled")
+        from redportes.control import Control
+
+        self.control = Control(progreso=lambda m: self.cola.put(("progreso", m)))
+        self._botones_escaneando(True)
         self.barra.start(12)
         self.txt_log.delete("1.0", "end")
         self.v_estado.set(f"Escaneando {red}…")
         args = dict(cliente=self.v_cliente.get().strip(), con_internet=self.v_internet.get(),
-                    forzar=forzar, guardar=self.v_guardar.get(),
+                    forzar=forzar, guardar=self.v_guardar.get(), usar_nmap=self.v_usar_nmap.get(),
                     avisar=self.v_avisar.get() and self._telegram_ok())
         threading.Thread(target=self._trabajo, args=(itf, red, puertos, args), daemon=True).start()
 
+    def _botones_escaneando(self, si: bool):
+        if si:
+            self.b_escanear.pack_forget()
+            self.b_detener.configure(state="normal")
+            self.b_detener.pack(side="right")
+            self.b_reiniciar.pack(side="right", padx=(0, 6))
+        else:
+            self.b_detener.pack_forget()
+            self.b_reiniciar.pack_forget()
+            self.b_escanear.configure(state="normal")
+            self.b_escanear.pack(side="right")
+
+    def probar_solo_internet(self):
+        from redportes.control import Cancelado, Control
+
+        self.control = Control(progreso=lambda m: self.cola.put(("progreso", m)))
+        self.b_solo_inet.configure(state="disabled")
+        self.b_det_inet.configure(state="normal")
+        self.barra.start(12)
+        self.txt_internet.delete("1.0", "end")
+        self.txt_internet.insert("end", "Analizando la salida a Internet… (puede tardar hasta un par de minutos)\n")
+
+        def trabajo():
+            try:
+                self.cola.put(("internet", escaneo.solo_internet(control=self.control)))
+            except Cancelado:
+                self.cola.put(("internet", {"cancelado": True}))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("internet", {"error": str(e)}))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_solo_internet(self, r: dict):
+        self.barra.stop()
+        self.barra["value"] = 0
+        self.b_solo_inet.configure(state="normal")
+        self.b_det_inet.configure(state="disabled")
+        self.txt_internet.delete("1.0", "end")
+        if r.get("cancelado"):
+            self.txt_internet.insert("end", "Detenido.")
+            self.v_estado.set("Prueba de Internet detenida.")
+            return
+        if r.get("error"):
+            self.txt_internet.insert("end", f"No se pudo terminar: {r['error']}")
+            return
+        self.txt_internet.insert("end", escaneo.texto_internet(r))
+        self.v_estado.set("Prueba de Internet lista.")
+
+    def _copiar_internet(self):
+        texto = self.txt_internet.get("1.0", "end").strip()
+        if texto:
+            self.raiz.clipboard_clear()
+            self.raiz.clipboard_append(texto)
+            self.v_estado.set("Resultado copiado.")
+
+    def detener(self):
+        if self.control:
+            self.control.detener()
+            self.b_detener.configure(state="disabled")
+            self.v_estado.set("Deteniendo…")
+
+    def reiniciar(self):
+        self._reiniciar_pendiente = True
+        self.detener()
+
     def _trabajo(self, itf, red, puertos, args):
+        from redportes.control import Cancelado
+
         try:
-            progreso = lambda m: self.cola.put(("progreso", m))  # noqa: E731
             r = escaneo.ejecutar(itf, red, puertos, cliente=args["cliente"],
                                  con_internet=args["con_internet"], forzar=args["forzar"],
-                                 progreso=progreso)
+                                 usar_nmap=args["usar_nmap"], control=self.control)
             cambios, previo = None, None
             if args["guardar"]:
                 previo = visitas.anterior(r["cliente"], r["red"])
@@ -589,6 +686,8 @@ class App:
             ruta = carpeta_informes() / informe.nombre_archivo(r["cliente"], r["red"])
             ruta.write_text(informe.generar(r, cambios), encoding="utf-8")
             self.cola.put(("fin", (r, cambios, ruta)))
+        except Cancelado:
+            self.cola.put(("cancelado", None))
         except Exception as e:  # noqa: BLE001
             self.cola.put(("error", f"{e}\n\n{traceback.format_exc()}"))
 
@@ -620,9 +719,20 @@ class App:
                     self._log(dato)
                 elif tipo == "fin":
                     self._terminar(*dato)
+                elif tipo == "cancelado":
+                    self.barra.stop()
+                    self.barra["value"] = 0
+                    self._botones_escaneando(False)
+                    self.v_estado.set("Escaneo detenido.")
+                    self._log("Escaneo detenido por el usuario.")
+                    if self._reiniciar_pendiente:
+                        self._reiniciar_pendiente = False
+                        self.raiz.after(300, self.escanear)
+                elif tipo == "internet":
+                    self._mostrar_solo_internet(dato)
                 elif tipo == "error":
                     self.barra.stop()
-                    self.b_escanear.configure(state="normal")
+                    self._botones_escaneando(False)
                     self.v_estado.set("Error en el escaneo.")
                     self._log(dato)
                     messagebox.showerror("Redportes", dato.split("\n\n")[0])
@@ -633,7 +743,9 @@ class App:
     def _terminar(self, r: dict, cambios: dict | None, ruta: Path):
         self.barra.stop()
         self.barra["value"] = 0
-        self.b_escanear.configure(state="normal")
+        self._botones_escaneando(False)
+        for a in r.get("avisos") or []:
+            self._log(f"⚠ {a['texto']} {a.get('recomendacion', '')}")
         self.resultado, self.ruta_informe = r, ruta
         self.b_informe.configure(state="normal")
         self.b_guardar.configure(state="normal")

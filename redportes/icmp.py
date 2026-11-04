@@ -46,7 +46,7 @@ def _abrir_socket():
         return None, ""
 
 
-def _barrido_socket(ips, timeout, tasa, progreso):
+def _barrido_socket(ips, timeout, tasa, progreso, parar=None):
     s, modo = _abrir_socket()
     if s is None:
         return None
@@ -103,6 +103,8 @@ def _barrido_socket(ips, timeout, tasa, progreso):
                 pass  # p. ej. broadcast o red inalcanzable
             if n % 64 == 0:
                 recibir()
+                if parar and parar():
+                    break
             t_prox += intervalo
             espera = t_prox - time.monotonic()
             if espera > 0:
@@ -111,7 +113,7 @@ def _barrido_socket(ips, timeout, tasa, progreso):
                 progreso(f"Ping: {n + 1}/{len(ips)} direcciones, {len(res)} responden…")
                 siguiente_aviso += 0.1
         fin = time.monotonic() + timeout
-        while time.monotonic() < fin and len(res) < len(pendientes):
+        while time.monotonic() < fin and len(res) < len(pendientes) and not (parar and parar()):
             r, _, _ = select.select([s], [], [], max(0.0, fin - time.monotonic()))
             if r:
                 recibir()
@@ -122,7 +124,7 @@ def _barrido_socket(ips, timeout, tasa, progreso):
 
 # ---------------------------------------------------------------- Windows
 
-def _barrido_windows(ips, timeout, progreso):
+def _barrido_windows(ips, timeout, progreso, parar=None):
     import ctypes
     import threading
 
@@ -158,29 +160,33 @@ def _barrido_windows(ips, timeout, progreso):
         return ip, (buf.raw[off_ttl], float(rtt))
 
     res = {}
+    ex = ThreadPoolExecutor(max_workers=512)
     try:
-        with ThreadPoolExecutor(max_workers=512) as ex:
-            for n, (ip, r) in enumerate(ex.map(uno, ips)):
-                if r:
-                    res[ip] = r
-                if progreso and len(ips) > 2048 and n and n % (len(ips) // 10) == 0:
-                    progreso(f"Ping: {n}/{len(ips)} direcciones, {len(res)} responden…")
+        for n, (ip, r) in enumerate(ex.map(uno, ips)):
+            if r:
+                res[ip] = r
+            if progreso and len(ips) > 2048 and n and n % (len(ips) // 10) == 0:
+                progreso(f"Ping: {n}/{len(ips)} direcciones, {len(res)} responden…")
+            if parar and parar():
+                break
     finally:
-        for h in manijas:
-            iphlp.IcmpCloseHandle(h)
+        ex.shutdown(wait=not (parar and parar()), cancel_futures=True)
+        if not (parar and parar()):
+            for h in manijas:
+                iphlp.IcmpCloseHandle(h)
     return res
 
 
 # ---------------------------------------------------------------- API
 
 def barrido(ips: list[str], timeout: float = 1.0, tasa: int = 2000,
-            progreso=None) -> dict[str, tuple[int | None, float]] | None:
+            progreso=None, parar=None) -> dict[str, tuple[int | None, float]] | None:
     """Devuelve {ip: (ttl, latencia_ms)} de las que respondieron, o None si no hay método."""
     if not ips:
         return {}
     if ES_WINDOWS:
-        return _barrido_windows(ips, timeout, progreso)
-    return _barrido_socket(ips, timeout, tasa, progreso)
+        return _barrido_windows(ips, timeout, progreso, parar)
+    return _barrido_socket(ips, timeout, tasa, progreso, parar)
 
 
 def tiempo_estimado(cantidad: int, tasa: int = 2000) -> float:

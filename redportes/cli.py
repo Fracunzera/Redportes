@@ -142,6 +142,8 @@ def _resumen(r: dict, cambios: dict | None) -> None:
         puertos = ",".join(str(p["numero"]) for p in e["puertos"])
         marca = "★" if e["es_este_equipo"] else ("GW" if e["es_puerta"] else "")
         print(f"{e['ip']:15} {(e['tipo'] + ' ' + marca)[:28]:28} {(e['fabricante'] or '')[:24]:24} {puertos}")
+    for a in r.get("avisos") or []:
+        print(f"\n⚠ {a['texto']}" + (f"\n  → {a['recomendacion']}" if a.get("recomendacion") else ""))
     hall = todos_los_hallazgos(r)
     if hall:
         print(f"\nPara revisar ({len(hall)}):")
@@ -292,6 +294,15 @@ def cmd_diagnostico(_args) -> int:
     return 0 if all(p["estado"] != "falla" for p in d["pruebas"]) else 1
 
 
+def cmd_internet(_args) -> int:
+    from redportes import escaneo
+
+    r = escaneo.solo_internet(_progreso)
+    print()
+    print(escaneo.texto_internet(r))
+    return 0
+
+
 def cmd_pagina(args) -> int:
     from redportes import pagina
 
@@ -415,6 +426,9 @@ def construir_parser() -> argparse.ArgumentParser:
     sub.add_parser("diagnostico", help="prueba rápida de conexión: router, Internet, DNS y navegación"
                    ).set_defaults(func=cmd_diagnostico)
 
+    sub.add_parser("internet", help="solo la salida a Internet: IP WAN, CGNAT, traceroute, IP pública y conexión"
+                   ).set_defaults(func=cmd_internet)
+
     pg = sub.add_parser("pagina", help="¿no abre una página? prueba DNS, conexión, HTTPS y MTU hasta encontrar la causa")
     pg.add_argument("pagina", help="dirección de la página, ej. https://www.ejemplo.com/algo")
     pg.add_argument("--mtu", action="store_true", help="medir el MTU aunque la página cargue")
@@ -436,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = construir_parser()
     comandos = {"escanear", "interfaces", "visitas", "informe", "actualizar-oui", "inventario",
-                "mensual", "telegram", "programar", "diagnostico", "equipo", "dns", "pagina", "gui"}
+                "mensual", "telegram", "programar", "diagnostico", "equipo", "dns", "pagina", "gui", "internet"}
     if not argv or (argv[0] not in comandos and argv[0] not in ("-h", "--help", "--version")):
         argv = ["escanear"] + argv
     args = parser.parse_args(argv)
