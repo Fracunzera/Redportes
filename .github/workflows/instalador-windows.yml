@@ -83,6 +83,19 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersion=${{ steps.v.outputs.version }}" empaquetado\redportes.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC falló" }
 
+      - name: Probar la instalación silenciosa (la que usa «Actualizar ahora»)
+        shell: pwsh
+        run: |
+          $inst = (Get-Item dist\Redportes-*-instalador.exe).FullName
+          $p = Start-Process $inst -ArgumentList "/SILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru
+          $p.WaitForExit(180000) | Out-Null
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\Redportes\Redportes.exe"
+          if (-not (Test-Path $exe)) { throw "No quedó instalado en $exe" }
+          Start-Sleep -Seconds 5
+          $abierto = Get-Process Redportes -ErrorAction SilentlyContinue
+          if (-not $abierto) { throw "El instalador no volvió a abrir Redportes" }
+          $abierto | Stop-Process -Force
+
       - name: Versión portable (zip)
         shell: pwsh
         run: |

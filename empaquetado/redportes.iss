@@ -6,6 +6,9 @@
 #endif
 
 [Setup]
+; Si Redportes está abierto, el instalador lo espera/cierra (actualización desde la app).
+CloseApplications=yes
+RestartApplications=no
 AppId={{8F3C2A51-6B0E-4D3A-9C5E-2E7A1B4D9F10}
 AppName=Redportes
 AppVersion={#Version}
@@ -45,4 +48,4 @@ Name: "{group}\Desinstalar Redportes"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Redportes"; Filename: "{app}\Redportes.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Redportes.exe"; Description: "{cm:LaunchProgram,Redportes}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Redportes.exe"; Description: "{cm:LaunchProgram,Redportes}"; Flags: nowait postinstall

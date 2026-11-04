@@ -2,6 +2,15 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.10.0] - 2026-11-04
+- **Actualizar desde la app:** «Actualizar ahora» (en el aviso o en Ayuda → Buscar actualizaciones) baja la versión que corresponde a tu sistema, la instala y vuelve a abrir Redportes, sin pasar por GitHub.
+  - Linux (AppImage): reemplaza el archivo y se reinicia.
+  - Windows con instalador: instala en silencio (solo una barra de progreso) y vuelve a abrir.
+  - Windows portable: reemplaza el programa sin tocar `datos\` ni `Informes\`.
+  - Instalado con pip: te da el comando para actualizar (ya copiado).
+- Verifica el tamaño de lo descargado antes de reemplazar nada; se puede cancelar.
+- Arreglo: en Linux, el botón de descarga llevaba al archivo de Windows.
+
 ## [0.9.3] - 2026-11-04
 - **IP interna vista por el proveedor:** con «salida a Internet», si tu proveedor tiene un servidor dentro de su red (como el speedtest de SS Servicios en Río Gallegos), Redportes muestra la IP 100.64.x.x que le asigna al router, aunque el router no la informe. Confirma el CGNAT.
 - **Herramientas → Página de mi proveedor que muestra la IP interna**, para sumar la de cualquier otro proveedor.

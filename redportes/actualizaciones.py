@@ -14,6 +14,7 @@ API = f"https://api.github.com/repos/{REPO}/releases/latest"
 PAGINA = f"https://github.com/{REPO}/releases/latest"
 DESCARGA_INSTALADOR = f"https://github.com/{REPO}/releases/latest/download/Redportes-Windows-instalador.exe"
 DESCARGA_PORTABLE = f"https://github.com/{REPO}/releases/latest/download/Redportes-Windows-portable.zip"
+DESCARGA_LINUX = f"https://github.com/{REPO}/releases/latest/download/Redportes-Linux-x86_64.AppImage"
 
 
 def version_tupla(v: str) -> tuple[int, ...]:
@@ -33,7 +34,9 @@ def consultar(timeout: float = 6) -> dict | None:
     except Exception:  # noqa: BLE001
         return None
     return {"version": d.get("tag_name", "").lstrip("v"), "url": d.get("html_url") or PAGINA,
-            "notas": (d.get("body") or "").strip()}
+            "notas": (d.get("body") or "").strip(),
+            "archivos": {a["name"]: {"url": a["browser_download_url"], "tamano": a.get("size", 0)}
+                         for a in d.get("assets", []) if a.get("name")}}
 
 
 def hay_nueva(cfg: dict, forzar: bool = False) -> dict | None:

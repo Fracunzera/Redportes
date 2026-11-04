@@ -195,7 +195,6 @@ class App:
 
     def _resultado_busqueda(self, info: dict | None):
         from redportes import actualizaciones, config
-        from redportes.sistema import es_portable
 
         if info is None:
             self.v_estado.set("No se pudo consultar GitHub.")
@@ -211,14 +210,86 @@ class App:
             messagebox.showinfo("Buscar actualizaciones", f"Tenés la última versión de Redportes ({__version__}).")
             return
         self._mostrar_nueva(info)
-        url = actualizaciones.DESCARGA_PORTABLE if es_portable() else actualizaciones.DESCARGA_INSTALADOR
-        cual = "el zip de la versión portable" if es_portable() else "el instalador"
-        if messagebox.askyesno("Hay una versión nueva",
-                               f"Salió Redportes {info['version']} (tenés la {__version__}).\n\n"
-                               f"¿Descargar {cual} ahora?"
-                               + ("" if es_portable() else "\nCuando termine, abrilo: se instala encima y "
-                                                           "conserva tu historial.")):
-            webbrowser.open(url)
+        self.actualizar_ahora(info)
+
+    # ------------------------------------------------------------ actualizar desde la app
+
+    def actualizar_ahora(self, info: dict):
+        from redportes import actualizador
+
+        forma = actualizador.forma_de_uso()
+        if forma == "pip":
+            self.raiz.clipboard_clear()
+            self.raiz.clipboard_append(actualizador.COMANDO_PIP)
+            messagebox.showinfo("Actualizar", "Redportes está instalado con pip. Para actualizarlo, corré en "
+                                f"una terminal (ya está copiado):\n\n{actualizador.COMANDO_PIP}")
+            return
+        if not messagebox.askyesno("Actualizar Redportes",
+                                   f"¿Descargar e instalar la versión {info['version']} ahora?\n\n"
+                                   "Redportes se va a cerrar y abrir de nuevo. Tus datos, historial e informes "
+                                   "no se tocan."):
+            return
+        v = tk.Toplevel(self.raiz)
+        v.title("Actualizando Redportes")
+        v.geometry("420x150")
+        v.transient(self.raiz)
+        v.resizable(False, False)
+        ttk.Label(v, text=f"Descargando Redportes {info['version']}…").pack(anchor="w", padx=16, pady=(16, 6))
+        barra = ttk.Progressbar(v, mode="determinate", maximum=100)
+        barra.pack(fill="x", padx=16)
+        l_det = ttk.Label(v, text="", foreground="#64748b")
+        l_det.pack(anchor="w", padx=16, pady=(4, 0))
+        cancelar = {"si": False}
+        ttk.Button(v, text="Cancelar", command=lambda: cancelar.update(si=True)).pack(anchor="e", padx=16, pady=8)
+        self._act = {"ventana": v, "barra": barra, "detalle": l_det}
+
+        def trabajo():
+            from redportes import actualizaciones
+
+            try:
+                datos = info if info.get("archivos") else actualizaciones.consultar()
+                if not datos:
+                    raise RuntimeError("No se pudo consultar GitHub. Revisá la conexión.")
+                ultimo = [0]
+
+                def progreso(hecho, total):
+                    pct = int(hecho * 100 / total) if total else 0
+                    if pct != ultimo[0]:
+                        ultimo[0] = pct
+                        self.cola.put(("act_progreso", (hecho, total)))
+
+                prep = actualizador.preparar(datos, progreso, lambda: cancelar["si"])
+                self.cola.put(("act_listo", prep))
+            except actualizador.Cancelado:
+                self.cola.put(("act_error", None))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("act_error", str(e)))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _act_progreso(self, hecho: int, total: int):
+        if total:
+            self._act["barra"]["value"] = hecho * 100 / total
+        self._act["detalle"].configure(text=f"{hecho / 2**20:.1f} de {total / 2**20:.1f} MB" if total
+                                       else f"{hecho / 2**20:.1f} MB")
+
+    def _act_fin(self, prep: dict | None, error: str | None):
+        from redportes import actualizador
+
+        self._act["ventana"].destroy()
+        if prep is None:
+            if error:
+                messagebox.showerror("Actualizar Redportes", error)
+            else:
+                self.v_estado.set("Actualización cancelada.")
+            return
+        messagebox.showinfo("Actualizar Redportes", actualizador.mensaje(prep))
+        try:
+            actualizador.aplicar(prep)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Actualizar Redportes", f"No se pudo instalar: {e}")
+            return
+        self.raiz.destroy()
 
     def _acerca_de(self):
         from redportes.sistema import carpeta_datos, es_portable
@@ -528,6 +599,12 @@ class App:
                 if tipo == "progreso":
                     self.v_estado.set(dato)
                     self._log(dato)
+                elif tipo == "act_progreso":
+                    self._act_progreso(*dato)
+                elif tipo == "act_listo":
+                    self._act_fin(dato, None)
+                elif tipo == "act_error":
+                    self._act_fin(None, dato)
                 elif tipo == "buscada":
                     self._resultado_busqueda(dato)
                 elif tipo == "nueva":
@@ -893,6 +970,9 @@ class App:
     # ------------------------------------------------------------ al abrir
 
     def _inicio(self):
+        from redportes import actualizador
+
+        actualizador.limpiar_restos()
         self._ofrecer_oui()
         self._preguntar_actualizaciones()
 
@@ -924,12 +1004,10 @@ class App:
 
     def _mostrar_nueva(self, info: dict):
         from redportes import actualizaciones
-        from redportes.sistema import es_portable
 
-        url = actualizaciones.DESCARGA_PORTABLE if es_portable() else actualizaciones.DESCARGA_INSTALADOR
         self.l_banner.configure(text=f"Hay una versión nueva de Redportes: {info['version']} "
                                      f"(tenés la {__version__}).")
-        self.b_bajar.configure(command=lambda: webbrowser.open(url))
+        self.b_bajar.configure(text="Actualizar ahora", command=lambda: self.actualizar_ahora(info))
         self.b_notas.configure(command=lambda: webbrowser.open(info.get("url") or actualizaciones.PAGINA))
         self.banner.pack(fill="x", before=self.f_form)
 
