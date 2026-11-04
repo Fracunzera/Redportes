@@ -232,7 +232,47 @@ def hallazgos_exposicion(ip: str, info: dict | None, cgnat: bool) -> tuple[list,
     return res, texto
 
 
-def revisar(puerta: str, cgnat_wan: bool = False) -> dict:
+# Proveedores con un servidor DENTRO de su red (antes del CGNAT) que muestra la IP del cliente:
+# así se ve la IP interna 100.64.x.x que el operador le asigna al router. Se aceptan aportes.
+PROVEEDORES = [
+    {"nombre": "SS Servicios (Río Gallegos)", "base": "https://speedtest.ssservicios.com.ar"},
+]
+# Rutas típicas de speedtests de código abierto que devuelven la IP del cliente.
+_RUTAS_IP = ("/", "/backend/getIP.php", "/getIP.php", "/backend/getIP.php?isp=true", "/api/ip", "/ip")
+
+
+def _ips_internas(texto: str, aceptar_privadas: bool = True) -> list[str]:
+    """IPs 100.64.x.x (y privadas, si se pide) que aparecen en el texto."""
+    res = []
+    for ip in re.findall(_IPV4, texto):
+        if (es_cgnat(ip) or (aceptar_privadas and es_privada(ip))) and ip not in res:
+            res.append(ip)
+    return res
+
+
+def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4) -> dict | None:
+    """IP interna que ve un servidor del proveedor. None si no hay ninguno al alcance."""
+    candidatos = [(p["nombre"], p["base"].rstrip("/") + ruta) for p in PROVEEDORES for ruta in _RUTAS_IP]
+    candidatos += [("tu proveedor", u) for u in (extra or [])]
+    for nombre, url in candidatos:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                texto = r.read(300000).decode("utf-8", errors="replace")
+        except Exception:
+            continue
+        # En la página principal puede haber direcciones privadas de los propios servidores del
+        # speedtest: ahí solo se acepta el rango CGNAT. En las rutas que devuelven la IP, cualquiera interna.
+        es_portada = url.rstrip("/").count("/") <= 2
+        internas = _ips_internas(texto, aceptar_privadas=not es_portada)
+        # Si el sitio respondió pero solo muestra IPs públicas, estamos fuera de esa red: no seguir con él.
+        if internas:
+            return {"proveedor": nombre, "ip": internas[0], "url": url.split("?")[0],
+                    "cgnat": es_cgnat(internas[0])}
+    return None
+
+
+def revisar(puerta: str, cgnat_wan: bool = False, urls_proveedor: list[str] | None = None) -> dict:
     cmd = comando_traza()
     if cmd is None:
         res = analizar_saltos([], puerta)
@@ -241,6 +281,11 @@ def revisar(puerta: str, cgnat_wan: bool = False) -> dict:
     else:
         res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=120)), puerta)
     res["ip_publica"] = ip_publica()
+    res["proveedor"] = ip_vista_por_proveedor(urls_proveedor)
+    if res["proveedor"] and res["proveedor"]["cgnat"] and not res["cgnat"]:
+        res["cgnat"] = True
+        res["conclusiones"].insert(0, f"CGNAT confirmado por {res['proveedor']['proveedor']}: el router sale a "
+                                      f"Internet con la IP interna {res['proveedor']['ip']}.")
     res["exposicion"], res["hallazgos"] = "", []
     if res["ip_publica"]:
         info = consultar_internetdb(res["ip_publica"])

@@ -2,6 +2,10 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.9.2] - 2026-11-04
+- **IP interna vista por el proveedor:** con «salida a Internet», si tu proveedor tiene un servidor dentro de su red (como el speedtest de SS Servicios en Río Gallegos), Redportes muestra la IP 100.64.x.x que le asigna al router, aunque el router no la informe. Confirma el CGNAT.
+- **Herramientas → Página de mi proveedor que muestra la IP interna**, para sumar la de cualquier otro proveedor.
+
 ## [0.9.1] - 2026-11-04
 Arreglos encontrados probando en una red estatal grande con Fedora:
 - **AppImage en Fedora/RHEL:** no encontraba los certificados raíz del sistema, así que fallaban la navegación HTTPS, la IP pública y Shodan. Ahora los busca en la ruta de cada distribución.

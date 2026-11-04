@@ -135,3 +135,31 @@ def test_entorno_empaquetado(monkeypatch):
     monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/usr/lib64")
     env = sistema.entorno_sistema()
     assert env["LD_LIBRARY_PATH"] == "/usr/lib64"
+
+
+def test_ip_vista_por_proveedor(monkeypatch):
+    import io
+
+    from redportes import internet
+
+    def abrir(req, timeout=0):
+        u = req.full_url
+        if u.endswith(".com.ar/"):
+            return io.BytesIO(b"<html>Tu IP: 170.233.31.217</html>")  # pública: no sirve
+        if "getIP.php" in u:
+            return io.BytesIO(b'{"processedString":"100.64.54.77 - SS Servicios"}')
+        raise OSError("404")
+
+    monkeypatch.setattr(internet.urllib.request, "urlopen", abrir)
+    r = internet.ip_vista_por_proveedor()
+    assert r["ip"] == "100.64.54.77" and r["cgnat"] and "SS Servicios" in r["proveedor"]
+
+
+def test_proveedor_fuera_de_su_red(monkeypatch):
+    import io
+
+    from redportes import internet
+
+    monkeypatch.setattr(internet.urllib.request, "urlopen",
+                        lambda req, timeout=0: io.BytesIO(b"IP 200.45.10.20"))
+    assert internet.ip_vista_por_proveedor() is None

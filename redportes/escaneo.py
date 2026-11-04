@@ -101,7 +101,10 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
         progreso("Analizando la salida a Internet…")
         from redportes import internet
 
-        salida = internet.revisar(puerta, cgnat_wan=datos_wan.get("tipo") == "cgnat")
+        from redportes import config
+
+        salida = internet.revisar(puerta, cgnat_wan=datos_wan.get("tipo") == "cgnat",
+                                  urls_proveedor=[u for u in [config.leer().get("url_proveedor")] if u])
         progreso("Probando la conexión (ping, DNS, navegación)…")
         from redportes import diagnostico
 
@@ -112,6 +115,11 @@ def ejecutar(interfaz: Interfaz, red: str, lista_puertos: list[int], cliente: st
     from redportes.internet import describir_dns
 
     lista = sorted(equipos.values(), key=lambda e: _orden_ip(e.ip))
+    if salida and salida.get("proveedor") and not datos_wan.get("ip"):
+        from redportes import wan as _wan
+
+        prov = salida["proveedor"]
+        datos_wan = _wan.describir(prov["ip"], f"el servidor de {prov['proveedor']}")
     r = {
         "version": __version__,
         "cliente": cliente,

@@ -122,6 +122,7 @@ class App:
         herr.add_command(label="Automatizar (Telegram y escaneo diario)…", command=self.abrir_automatizar)
         herr.add_command(label="Exportar inventario (Excel)…", command=self.exportar_inventario)
         herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
+        herr.add_command(label="Página de mi proveedor que muestra la IP interna…", command=self.configurar_proveedor)
         herr.add_separator()
         herr.add_command(label="Abrir la carpeta de informes", command=lambda: abrir(carpeta_informes()))
         if not ES_WINDOWS and not ES_MAC:
@@ -154,6 +155,25 @@ class App:
             return
         messagebox.showinfo("Redportes", "Listo: Redportes aparece en el menú de aplicaciones "
                             f"(puede tardar unos segundos).\n\n{ruta}")
+
+    def configurar_proveedor(self):
+        from tkinter import simpledialog
+
+        from redportes import config, internet
+
+        cfg = config.leer()
+        conocidos = "\n".join(f"• {p['nombre']}: {p['base']}" for p in internet.PROVEEDORES)
+        url = simpledialog.askstring(
+            "Proveedor de Internet",
+            "Algunos proveedores tienen una página (por ejemplo su speedtest) que muestra la IP interna "
+            "del cliente cuando hay CGNAT. Si el tuyo tiene una, pegá la dirección. Dejalo vacío para no usar ninguna.\n\n"
+            f"Ya incluidos:\n{conocidos}",
+            initialvalue=cfg.get("url_proveedor", ""), parent=self.raiz)
+        if url is None:
+            return
+        cfg["url_proveedor"] = url.strip()
+        config.guardar(cfg)
+        self.v_estado.set("Página del proveedor guardada: se usa al escanear con «salida a Internet».")
 
     def _cambiar_aviso_auto(self):
         from redportes import config
