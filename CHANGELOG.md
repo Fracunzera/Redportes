@@ -7,6 +7,7 @@ Todas las versiones de Redportes. La más nueva, arriba.
 - **Herramientas → Agregar Redportes al menú de aplicaciones** (Linux).
 - El AppImage también sirve por consola: `./Redportes-Linux-x86_64.AppImage escanear …`, y los escaneos programados con cron apuntan al archivo.
 - En Linux los informes van a la carpeta de documentos del escritorio («Documentos» en castellano).
+- Consola: `redportes gui` abre la ventana; `redportes -i` solo muestra la lista de interfaces en vez de dar error.
 
 ## [0.8.1] - 2026-11-03
 - Barra de menú. **Ayuda → Buscar actualizaciones** consulta en el momento y ofrece descargar la versión nueva; **Ayuda → Avisar de versiones nuevas al abrir** prende o apaga el aviso automático cuando quieras.

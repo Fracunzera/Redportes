@@ -30,6 +30,24 @@ def _nombre_archivo(cliente: str, red: str) -> str:
 
 # ---------------------------------------------------------------- comandos
 
+def _primera_interfaz() -> str:
+    from redportes.red import listar_interfaces
+
+    lista = listar_interfaces()
+    return lista[0].nombre if lista else ""
+
+
+def cmd_gui(_args) -> int:
+    try:
+        from redportes import gui
+    except ImportError:
+        print("Falta tkinter. Instalalo con: sudo dnf install python3-tkinter (Fedora) "
+              "o sudo apt install python3-tk (Debian/Ubuntu).", file=sys.stderr)
+        return 1
+    sys.argv = sys.argv[:1]
+    return gui.main()
+
+
 def cmd_interfaces(_args) -> int:
     from redportes.red import listar_interfaces, puerta_de_enlace
 
@@ -44,6 +62,12 @@ def cmd_interfaces(_args) -> int:
 def cmd_escanear(args) -> int:
     from redportes import escaneo, informe, visitas
     from redportes.puertos import lista_de_puertos
+
+    if args.interfaz == "":
+        cmd_interfaces(args)
+        print("\nPara escanear desde una de ellas: redportes -i NOMBRE   (por ejemplo: redportes -i "
+              + (_primera_interfaz() or "eth0") + ")")
+        return 0
 
     try:
         itf, red = escaneo.resolver_red(args.interfaz, args.red)
@@ -325,7 +349,8 @@ def construir_parser() -> argparse.ArgumentParser:
 
     e = sub.add_parser("escanear", help="escanea la red y genera el informe (comando por defecto)")
     e.add_argument("-r", "--red", help="red a escanear, ej. 192.168.1.0/24 (por defecto la de la interfaz principal)")
-    e.add_argument("-i", "--interfaz", help="interfaz a usar (ver `redportes interfaces`)")
+    e.add_argument("-i", "--interfaz", nargs="?", const="",
+                   help="interfaz a usar; solo «-i» muestra la lista")
     e.add_argument("-p", "--puertos", default="rapido",
                    help="rapido (21 puertos), completo, ninguno o lista: 22,80,8000-8010")
     e.add_argument("-c", "--cliente", help="nombre del cliente o sitio, para el historial de visitas")
@@ -374,6 +399,7 @@ def construir_parser() -> argparse.ArgumentParser:
     pr.set_defaults(func=cmd_programar)
 
     sub.add_parser("interfaces", help="muestra las interfaces y la puerta de enlace").set_defaults(func=cmd_interfaces)
+    sub.add_parser("gui", help="abre la ventana de Redportes").set_defaults(func=cmd_gui)
 
     v = sub.add_parser("visitas", help="lista las visitas guardadas")
     v.add_argument("-c", "--cliente")
@@ -410,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = construir_parser()
     comandos = {"escanear", "interfaces", "visitas", "informe", "actualizar-oui", "inventario",
-                "mensual", "telegram", "programar", "diagnostico", "equipo", "dns", "pagina"}
+                "mensual", "telegram", "programar", "diagnostico", "equipo", "dns", "pagina", "gui"}
     if not argv or (argv[0] not in comandos and argv[0] not in ("-h", "--help", "--version")):
         argv = ["escanear"] + argv
     args = parser.parse_args(argv)
