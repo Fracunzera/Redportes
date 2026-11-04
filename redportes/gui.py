@@ -165,7 +165,7 @@ class App:
         from redportes import config, internet
 
         cfg = config.leer()
-        conocidos = "\n".join(f"• {p['nombre']}: {p['base']}" for p in internet.PROVEEDORES)
+        conocidos = "\n".join(f"• {p['nombre']}: {', '.join(p['bases'])}" for p in internet.PROVEEDORES)
         url = simpledialog.askstring(
             "Proveedor de Internet",
             "Algunos proveedores tienen una página (por ejemplo su speedtest) que muestra la IP interna "

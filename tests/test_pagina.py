@@ -183,3 +183,25 @@ def test_solo_consulta_al_proveedor_del_camino(monkeypatch):
     nombres["200.51.0.1"] = "host.speedy.com.ar"  # Movistar: no es SS Servicios
     saltos[2]["ip"] = "200.51.0.1"
     assert internet.proveedores_del_camino(saltos, "") == []
+
+
+def test_speedtest_interno_del_proveedor(monkeypatch):
+    import io
+
+    from redportes import internet
+
+    pedidos = []
+
+    def abrir(req, timeout=0, **k):
+        u = req.full_url
+        pedidos.append(u)
+        if "ssservicios.com.ar" in u:
+            raise OSError("sin conexión")          # el público no responde
+        if u == "https://web.sslocal/speedtest/":
+            return io.BytesIO(b"<html>servidor 10.0.0.5 - Tu IP: 100.64.54.93</html>")
+        raise OSError("404")
+
+    monkeypatch.setattr(internet.urllib.request, "urlopen", abrir)
+    r = internet.ip_vista_por_proveedor()
+    assert r["ip"] == "100.64.54.93"  # en la portada solo se acepta el rango CGNAT, no la 10.0.0.5
+    assert sum("ssservicios.com.ar" in u for u in pedidos) == 1  # no insiste con un servidor caído

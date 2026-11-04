@@ -9,6 +9,7 @@ import ipaddress
 import json
 import re
 import socket
+import ssl
 import urllib.error
 import urllib.request
 
@@ -239,8 +240,9 @@ def hallazgos_exposicion(ip: str, info: dict | None, cgnat: bool) -> tuple[list,
 PROVEEDORES = [
     # «dominio»: solo se consulta si la conexión pasa por la red de ese proveedor
     # (se reconoce por el nombre de los routers del camino o de la IP pública).
-    {"nombre": "SS Servicios (Río Gallegos)", "base": "https://speedtest.ssservicios.com.ar",
-     "dominio": "ssservicios.com.ar"},
+    {"nombre": "SS Servicios (Río Gallegos)", "dominio": "ssservicios.com.ar",
+     "bases": ["https://speedtest.ssservicios.com.ar",
+               "https://web.sslocal/speedtest"]},   # solo existe dentro de la red del proveedor
 ]
 # Rutas típicas de speedtests de código abierto que devuelven la IP del cliente.
 _RUTAS_IP = ("/", "/backend/getIP.php", "/getIP.php", "/backend/getIP.php?isp=true", "/api/ip", "/ip")
@@ -284,7 +286,7 @@ def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
                            proveedores: list[dict] | None = None) -> dict | None:
     """IP interna que ve un servidor del proveedor. None si no hay ninguno al alcance."""
     lista = PROVEEDORES if proveedores is None else proveedores
-    candidatos = [(p["nombre"], p["base"].rstrip("/"), ruta) for p in lista for ruta in _RUTAS_IP]
+    candidatos = [(p["nombre"], base.rstrip("/"), ruta) for p in lista for base in p["bases"] for ruta in _RUTAS_IP]
     candidatos += [("tu proveedor", u.rstrip("/"), "") for u in (extra or [])]
     caidos: set[str] = set()
     for nombre, base, ruta in candidatos:
@@ -293,7 +295,11 @@ def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
         url = base + ruta
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
-            with abrir_url(req, timeout=timeout) as r:
+            # Páginas internas del proveedor: suelen tener certificado propio. Solo leemos nuestra IP.
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
                 texto = r.read(300000).decode("utf-8", errors="replace")
         except urllib.error.HTTPError:
             continue          # esa ruta no existe en ese servidor: probar la siguiente
@@ -302,7 +308,7 @@ def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
             continue
         # En la página principal puede haber direcciones privadas de los propios servidores del
         # speedtest: ahí solo se acepta el rango CGNAT. En las rutas que devuelven la IP, cualquiera interna.
-        es_portada = url.rstrip("/").count("/") <= 2
+        es_portada = ruta in ("", "/")
         internas = _ips_internas(texto, aceptar_privadas=not es_portada)
         # Si el sitio respondió pero solo muestra IPs públicas, estamos fuera de esa red: no seguir con él.
         if internas:
