@@ -163,3 +163,23 @@ def test_proveedor_fuera_de_su_red(monkeypatch):
     monkeypatch.setattr(internet.urllib.request, "urlopen",
                         lambda req, timeout=0: io.BytesIO(b"IP 200.45.10.20"))
     assert internet.ip_vista_por_proveedor() is None
+
+
+def test_solo_consulta_al_proveedor_del_camino(monkeypatch):
+    from redportes import internet
+
+    saltos = [{"ip": "192.168.3.1", "tipo": "privada"}, {"ip": "100.64.54.1", "tipo": "cgnat"},
+              {"ip": "170.233.116.1", "tipo": "publica"}]
+    nombres = {"170.233.116.1": "ne8k.hq.ssservicios.com.ar"}
+
+    def inverso(ip):
+        if ip in nombres:
+            return nombres[ip], [], [ip]
+        raise OSError
+
+    monkeypatch.setattr(internet.socket, "gethostbyaddr", inverso)
+    assert [p["dominio"] for p in internet.proveedores_del_camino(saltos, "170.233.31.217")] == ["ssservicios.com.ar"]
+    nombres.clear()
+    nombres["200.51.0.1"] = "host.speedy.com.ar"  # Movistar: no es SS Servicios
+    saltos[2]["ip"] = "200.51.0.1"
+    assert internet.proveedores_del_camino(saltos, "") == []

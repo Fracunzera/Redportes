@@ -8,6 +8,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import socket
 import urllib.error
 import urllib.request
 
@@ -235,7 +236,10 @@ def hallazgos_exposicion(ip: str, info: dict | None, cgnat: bool) -> tuple[list,
 # Proveedores con un servidor DENTRO de su red (antes del CGNAT) que muestra la IP del cliente:
 # así se ve la IP interna 100.64.x.x que el operador le asigna al router. Se aceptan aportes.
 PROVEEDORES = [
-    {"nombre": "SS Servicios (Río Gallegos)", "base": "https://speedtest.ssservicios.com.ar"},
+    # «dominio»: solo se consulta si la conexión pasa por la red de ese proveedor
+    # (se reconoce por el nombre de los routers del camino o de la IP pública).
+    {"nombre": "SS Servicios (Río Gallegos)", "base": "https://speedtest.ssservicios.com.ar",
+     "dominio": "ssservicios.com.ar"},
 ]
 # Rutas típicas de speedtests de código abierto que devuelven la IP del cliente.
 _RUTAS_IP = ("/", "/backend/getIP.php", "/getIP.php", "/backend/getIP.php?isp=true", "/api/ip", "/ip")
@@ -250,16 +254,50 @@ def _ips_internas(texto: str, aceptar_privadas: bool = True) -> list[str]:
     return res
 
 
-def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4) -> dict | None:
+def nombres_del_camino(ips: list[str], tiempo_max: float = 4) -> list[str]:
+    """Nombres (DNS inverso) de las IPs públicas del camino, para reconocer al proveedor."""
+    from concurrent.futures import ThreadPoolExecutor, wait
+
+    def uno(ip):
+        try:
+            return socket.gethostbyaddr(ip)[0].lower()
+        except OSError:
+            return ""
+
+    ex = ThreadPoolExecutor(max_workers=6)
+    futuros = [ex.submit(uno, ip) for ip in ips[:6]]
+    hechos, _ = wait(futuros, timeout=tiempo_max)
+    ex.shutdown(wait=False, cancel_futures=True)
+    return [f.result() for f in hechos if f.result()]
+
+
+def proveedores_del_camino(saltos: list[dict], ip_publica_: str) -> list[dict]:
+    publicas = [s["ip"] for s in saltos if s.get("tipo") == "publica"][:4]
+    if ip_publica_:
+        publicas.insert(0, ip_publica_)
+    nombres = nombres_del_camino(publicas)
+    return [p for p in PROVEEDORES if any(n == p["dominio"] or n.endswith("." + p["dominio"]) for n in nombres)]
+
+
+def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
+                           proveedores: list[dict] | None = None) -> dict | None:
     """IP interna que ve un servidor del proveedor. None si no hay ninguno al alcance."""
-    candidatos = [(p["nombre"], p["base"].rstrip("/") + ruta) for p in PROVEEDORES for ruta in _RUTAS_IP]
-    candidatos += [("tu proveedor", u) for u in (extra or [])]
-    for nombre, url in candidatos:
+    lista = PROVEEDORES if proveedores is None else proveedores
+    candidatos = [(p["nombre"], p["base"].rstrip("/"), ruta) for p in lista for ruta in _RUTAS_IP]
+    candidatos += [("tu proveedor", u.rstrip("/"), "") for u in (extra or [])]
+    caidos: set[str] = set()
+    for nombre, base, ruta in candidatos:
+        if base in caidos:
+            continue
+        url = base + ruta
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 texto = r.read(300000).decode("utf-8", errors="replace")
+        except urllib.error.HTTPError:
+            continue          # esa ruta no existe en ese servidor: probar la siguiente
         except Exception:
+            caidos.add(base)  # el servidor no responde: no insistir con las otras rutas
             continue
         # En la página principal puede haber direcciones privadas de los propios servidores del
         # speedtest: ahí solo se acepta el rango CGNAT. En las rutas que devuelven la IP, cualquiera interna.
@@ -281,7 +319,9 @@ def revisar(puerta: str, cgnat_wan: bool = False, urls_proveedor: list[str] | No
     else:
         res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=120)), puerta)
     res["ip_publica"] = ip_publica()
-    res["proveedor"] = ip_vista_por_proveedor(urls_proveedor)
+    conocidos = proveedores_del_camino(res["saltos"], res["ip_publica"])
+    res["proveedor"] = (ip_vista_por_proveedor(urls_proveedor, proveedores=conocidos)
+                        if conocidos or urls_proveedor else None)
     if res["proveedor"] and res["proveedor"]["cgnat"] and not res["cgnat"]:
         res["cgnat"] = True
         res["conclusiones"].insert(0, f"CGNAT confirmado por {res['proveedor']['proveedor']}: el router sale a "
