@@ -18,6 +18,50 @@ def tiene(programa: str) -> bool:
     return shutil.which(programa) is not None
 
 
+# ---------------------------------------------------------------- entorno del ejecutable empaquetado
+
+# Dónde guarda cada distribución los certificados raíz. El Python empaquetado (AppImage) trae un
+# OpenSSL armado en Ubuntu que solo mira la ruta de Debian/Ubuntu: en Fedora no confiaría en nadie.
+_CERTIFICADOS = (
+    "/etc/ssl/certs/ca-certificates.crt",                 # Debian, Ubuntu, Mint, Arch
+    "/etc/pki/tls/certs/ca-bundle.crt",                   # Fedora, RHEL, CentOS, Rocky
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",  # Fedora (otra ruta)
+    "/etc/ssl/ca-bundle.pem",                             # openSUSE
+    "/etc/ssl/cert.pem",                                  # Alpine, macOS
+)
+
+
+def _preparar_entorno() -> None:
+    if ES_WINDOWS or not getattr(sys, "frozen", False):
+        return
+    if not os.environ.get("SSL_CERT_FILE"):
+        for ruta in _CERTIFICADOS:
+            if os.path.exists(ruta):
+                os.environ["SSL_CERT_FILE"] = ruta
+                break
+
+
+def entorno_sistema() -> dict | None:
+    """Entorno para lanzar programas del sistema (resolvectl, nmcli…) desde el ejecutable empaquetado.
+
+    PyInstaller apunta LD_LIBRARY_PATH a sus propias bibliotecas; si un programa del sistema las
+    hereda puede fallar. Se restaura el valor original.
+    """
+    if ES_WINDOWS or not getattr(sys, "frozen", False):
+        return None
+    env = dict(os.environ)
+    for var in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
+        original = env.pop(f"{var}_ORIG", None)
+        if original is not None:
+            env[var] = original
+        else:
+            env.pop(var, None)
+    return env
+
+
+_preparar_entorno()
+
+
 def ejecutar(cmd: list[str], timeout: float = 10, encoding: str | None = None) -> str:
     """Ejecuta un comando y devuelve su salida estándar (vacía si falla).
 
@@ -36,6 +80,7 @@ def ejecutar(cmd: list[str], timeout: float = 10, encoding: str | None = None) -
             errors="replace",
             # En Windows evita que se abra una ventana de consola por cada ping.
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            env=entorno_sistema(),
         )
         return r.stdout or ""
     except (OSError, subprocess.SubprocessError):

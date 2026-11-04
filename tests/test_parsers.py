@@ -125,7 +125,7 @@ def test_analisis_doble_nat_y_cgnat():
               {"n": 3, "ip": "100.72.0.1", "ms": 20}, {"n": 4, "ip": "8.8.4.4", "ms": 21}]
     a = internet.analizar_saltos(saltos, "192.168.50.1")
     assert a["doble_nat"] and a["cgnat"]
-    assert any("Doble NAT" in c for c in a["conclusiones"])
+    assert any("doble NAT" in c for c in a["conclusiones"])
 
 
 def test_analisis_salida_directa():

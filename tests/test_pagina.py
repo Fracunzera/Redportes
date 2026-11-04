@@ -88,3 +88,50 @@ def test_error_del_servidor(base):
 def test_texto(base):
     t = pagina.como_texto(pagina.investigar("sitio.com"))
     assert "¿Por qué no abre sitio.com?" in t and "✅" in t
+
+
+def test_certificado_local_no_es_proxy(base):
+    base.setattr(pagina, "probar_https",
+                 lambda d, ip: {"etapa": "certificado", "error": "unable to get local issuer certificate"})
+    base.setattr(pagina, "emisor_certificado", lambda d, ip: "US Google Trust Services WR2")
+    r = pagina.investigar("sitio.com")
+    assert "no confía" in r["veredicto"] and "intercepta" not in r["veredicto"]
+
+
+def test_red_grande_no_es_doble_nat():
+    from redportes import internet
+
+    saltos = [{"n": 1, "ip": "10.0.3.254", "ms": 0}, {"n": 2, "ip": "10.253.253.254", "ms": 1},
+              {"n": 3, "ip": "10.0.180.1", "ms": 1}, {"n": 4, "ip": "192.168.149.1", "ms": 1},
+              {"n": 5, "ip": "10.18.18.1", "ms": 2}, {"n": 6, "ip": "170.233.116.1", "ms": 2}]
+    a = internet.analizar_saltos(saltos, "10.0.3.254")
+    assert not a["doble_nat"] and "ruteo interno" in a["conclusiones"][0]
+
+
+def test_ip_publica_con_respaldo(monkeypatch):
+    import io
+
+    from redportes import internet
+
+    def abrir(req, timeout=0):
+        if "ipify" in req.full_url:
+            raise OSError("bloqueado")
+        if "icanhazip" in req.full_url:
+            return io.BytesIO(b"<html>10.0.0.1</html>")  # privada: se ignora
+        return io.BytesIO(b"<b>Tu IP es 170.233.31.217</b>")
+
+    monkeypatch.setattr(internet.urllib.request, "urlopen", abrir)
+    assert internet.ip_publica() == "170.233.31.217"
+
+
+def test_entorno_empaquetado(monkeypatch):
+    import sys
+
+    from redportes import sistema
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sistema, "ES_WINDOWS", False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/_MEI123")
+    monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/usr/lib64")
+    env = sistema.entorno_sistema()
+    assert env["LD_LIBRARY_PATH"] == "/usr/lib64"

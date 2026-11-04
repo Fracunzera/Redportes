@@ -27,11 +27,11 @@ DNS_CONOCIDOS = {
 
 def comando_traza() -> list[str] | None:
     if ES_WINDOWS:
-        return ["tracert", "-d", "-h", "10", "-w", "800", DESTINO]
+        return ["tracert", "-d", "-h", "15", "-w", "1500", DESTINO]
     if tiene("traceroute"):
-        return ["traceroute", "-n", "-q", "1", "-w", "1", "-m", "10", DESTINO]
+        return ["traceroute", "-n", "-q", "2", "-w", "2", "-m", "15", DESTINO]
     if tiene("tracepath"):
-        return ["tracepath", "-n", "-m", "10", DESTINO]
+        return ["tracepath", "-n", "-m", "15", DESTINO]
     return None
 
 
@@ -83,11 +83,17 @@ def analizar_saltos(saltos: list[dict], puerta: str) -> dict:
 
     conclusiones = []
     doble_nat = False
-    if len(privados) >= 2 and saltos and saltos[0]["tipo"] == "privada" and len(saltos) > 1 \
+    if len(privados) >= 3:
+        conclusiones.append(
+            f"Red con ruteo interno: hay {len(privados)} saltos privados antes de llegar a Internet "
+            f"({', '.join(s['ip'] for s in privados[:5])}). Es normal en redes grandes con varios routers; "
+            "desde acá no se puede saber cuántos de ellos hacen NAT."
+        )
+    elif len(privados) >= 2 and saltos and saltos[0]["tipo"] == "privada" and len(saltos) > 1 \
             and saltos[1]["tipo"] == "privada":
         doble_nat = True
         conclusiones.append(
-            f"Doble NAT: el router ({saltos[0]['ip']}) sale por otro equipo que también traduce "
+            f"Posible doble NAT: el router ({saltos[0]['ip']}) sale por otro equipo con IP privada "
             f"({saltos[1]['ip']}). Puede ser un segundo router del cliente o el módem del operador. "
             "Complica abrir puertos, VPNs y algunas llamadas de VoIP. Si el segundo equipo es el "
             "módem del operador, conviene ponerlo en modo bridge."
@@ -108,14 +114,26 @@ def analizar_saltos(saltos: list[dict], puerta: str) -> dict:
             "conclusiones": conclusiones}
 
 
+# Varios servicios por si alguno está caído o filtrado en la red.
+SERVICIOS_IP = ("https://api.ipify.org", "https://icanhazip.com", "https://ifconfig.me/ip",
+                "https://www.cualesmiip.com")
+
+
 def ip_publica() -> str:
-    try:
-        req = urllib.request.Request("https://api.ipify.org?format=json",
-                                     headers={"User-Agent": "redportes"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            return json.loads(r.read().decode())["ip"]
-    except Exception:
-        return ""
+    for url in SERVICIOS_IP:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
+            with urllib.request.urlopen(req, timeout=6) as r:
+                texto = r.read(200000).decode("utf-8", errors="replace")
+        except Exception:
+            continue
+        for ip in re.findall(_IPV4, texto):
+            try:
+                if ipaddress.IPv4Address(ip).is_global:
+                    return ip
+            except ValueError:
+                continue
+    return ""
 
 
 def describir_dns(servidores: list[str], puerta: str) -> list[dict]:
@@ -221,7 +239,7 @@ def revisar(puerta: str, cgnat_wan: bool = False) -> dict:
         res["conclusiones"] = ["No se encontró traceroute/tracepath en este equipo; "
                                "instalalo para analizar la salida a Internet."]
     else:
-        res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=60)), puerta)
+        res = analizar_saltos(parsear_traza(ejecutar(cmd, timeout=120)), puerta)
     res["ip_publica"] = ip_publica()
     res["exposicion"], res["hallazgos"] = "", []
     if res["ip_publica"]:

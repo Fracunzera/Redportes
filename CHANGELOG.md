@@ -2,6 +2,15 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.9.1] - 2026-11-04
+Arreglos encontrados probando en una red estatal grande con Fedora:
+- **AppImage en Fedora/RHEL:** no encontraba los certificados raíz del sistema, así que fallaban la navegación HTTPS, la IP pública y Shodan. Ahora los busca en la ruta de cada distribución.
+- **El diagnóstico ya no confunde** «al equipo le faltan certificados raíz o tiene mal la hora» con «un firewall intercepta HTTPS».
+- **DNS con systemd-resolved** (Fedora, Ubuntu): muestra los DNS reales en vez de 127.0.0.53, también desde el AppImage.
+- **IP pública:** si un servicio está filtrado prueba con otros (icanhazip, ifconfig.me, cualesmiip.com).
+- **Traceroute** más paciente (2 intentos por salto, hasta 15 saltos): ya no aparecen asteriscos donde hay routers que responden.
+- **Redes grandes:** con 3 o más saltos privados antes de Internet lo informa como ruteo interno, no como doble NAT.
+
 ## [0.9.0] - 2026-11-04
 - **Linux con ventana:** `Redportes-Linux-x86_64.AppImage`, un solo archivo que se abre con doble clic en Debian 12, Ubuntu 22.04+, Mint o Fedora. No necesita Python. Es la misma interfaz que en Windows.
 - **Herramientas → Agregar Redportes al menú de aplicaciones** (Linux).

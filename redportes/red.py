@@ -140,9 +140,15 @@ def servidores_dns() -> list[str]:
         servidores = parsear_resolv_conf(Path("/etc/resolv.conf").read_text())
     except OSError:
         servidores = []
-    # systemd-resolved: el resolv.conf apunta a 127.0.0.53, preguntamos los reales.
+    # systemd-resolved (Fedora, Ubuntu): el resolv.conf apunta a 127.0.0.53; buscamos los reales.
     if servidores and all(s.startswith("127.") for s in servidores):
-        reales = re.findall(_IPV4, ejecutar(["resolvectl", "dns"]))
+        try:
+            reales = parsear_resolv_conf(Path("/run/systemd/resolve/resolv.conf").read_text())
+        except OSError:
+            reales = []
+        if not reales:
+            reales = re.findall(_IPV4, ejecutar(["resolvectl", "dns"]))
+        reales = [r for r in reales if not r.startswith("127.")]
         if reales:
             return list(dict.fromkeys(reales))
     return servidores

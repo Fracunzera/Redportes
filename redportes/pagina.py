@@ -64,6 +64,52 @@ def emisor_certificado(dominio: str, ip: str, puerto: int = 443, timeout: float 
     return " ".join(t.decode() for t in textos[:12])
 
 
+# Autoridades públicas que firman los sitios comunes. Si el certificado recibido viene de una de
+# estas y aun así no valida, el problema es del equipo (certificados raíz o fecha), no de la red.
+_CA_PUBLICAS = ("google trust services", "let's encrypt", "isrg", "digicert", "sectigo", "comodo",
+                "globalsign", "amazon", "microsoft", "cloudflare", "entrust", "godaddy", "baltimore",
+                "usertrust", "certum", "buypass", "zerossl", "actalis", "harica", "identrust")
+
+
+def clasificar_certificado(dominio: str, ip: str = "") -> tuple[str, str]:
+    """('publica' | 'proxy' | 'desconocido', nombre) según quién firmó el certificado recibido."""
+    if not ip:
+        try:
+            ip = socket.getaddrinfo(dominio, 443, socket.AF_INET)[0][4][0]
+        except OSError:
+            return "desconocido", ""
+    emisor = emisor_certificado(dominio, ip).lower()
+    proxy = next((x for x in _PROXIES if x in emisor), "")
+    if proxy:
+        return "proxy", proxy.title()
+    ca = next((x for x in _CA_PUBLICAS if x in emisor), "")
+    if ca:
+        return "publica", ca.title()
+    return "desconocido", ""
+
+
+def explicar_certificado(error: str, clase: str, nombre: str) -> tuple[str, list[str]]:
+    """Veredicto y qué hacer cuando un certificado no valida."""
+    e = error.lower()
+    if clase == "proxy":
+        return (f"Un equipo de la red ({nombre}) intercepta las conexiones seguras.",
+                ["El firewall/antivirus reemplaza el certificado del sitio y este equipo no confía en él.",
+                 "Hay que instalar su certificado en la PC o excluir el sitio de la inspección HTTPS."])
+    if "expired" in e or "not yet valid" in e:
+        return ("El certificado figura vencido (o todavía no válido).",
+                ["Revisá primero la fecha y la hora de la PC: si están mal, todos los sitios dan este error.",
+                 "Si la hora está bien, el certificado del sitio está vencido: avisale al dueño."])
+    if clase == "publica":
+        return (f"Este equipo no confía en certificados normales ({nombre}): le faltan los certificados raíz "
+                "o tiene mal la fecha y hora.",
+                ["Revisá la fecha y hora de la PC.",
+                 "Actualizá el sistema (en Linux: el paquete ca-certificates).",
+                 "No es un problema de la red: el sitio presenta un certificado válido."])
+    return ("El certificado del sitio no es válido para esta dirección.",
+            [f"Detalle: {error}.", "Revisá la fecha y hora de la PC; si están bien, es un problema del sitio o "
+             "algo en la red lo intercepta."])
+
+
 def probar_https(dominio: str, ip: str, timeout: float = 10) -> dict:
     """Handshake TLS validando el certificado y pedido HTTP. Lee hasta 256 KB para detectar cuelgues (MTU)."""
     ctx = ssl.create_default_context()
@@ -263,20 +309,10 @@ def investigar(texto: str, progreso=lambda m: None, medir_siempre_mtu: bool = Fa
             progreso("Probando HTTPS…")
             h = probar_https(dominio, ip_sistema)
             if h["etapa"] == "certificado":
-                emisor = emisor_certificado(dominio, ip_sistema).lower()
-                proxy = next((p for p in _PROXIES if p in emisor), "")
+                clase, nombre = clasificar_certificado(dominio, ip_sistema)
                 pasos.append(Paso(nombres[4], "falla", h["error"]))
-                if proxy:
-                    fin("falla", f"Un equipo de la red ({proxy.title()}) intercepta las conexiones seguras.",
-                        ["El firewall/antivirus reemplaza el certificado del sitio y el navegador no confía.",
-                         "Hay que instalar su certificado en la PC o excluir el sitio de la inspección HTTPS."])
-                if "expired" in h["error"].lower():
-                    fin("falla", "El certificado del sitio está vencido.",
-                        ["Es un problema del sitio: avisale al dueño. Revisá también que la fecha y hora de la "
-                         "PC estén bien (una fecha errónea da el mismo error)."])
-                fin("falla", "El certificado del sitio no es válido para esta dirección.",
-                    [f"Detalle: {h['error']}.", "Revisá la fecha y hora de la PC; si están bien, es un problema "
-                     "del sitio o algo en la red lo intercepta."])
+                veredicto, hacer = explicar_certificado(h["error"], clase, nombre)
+                fin("falla", veredicto, hacer)
             if h["etapa"] in ("tls", "respuesta") and h.get("colgado"):
                 pasos.append(Paso(nombres[4] if h["etapa"] == "tls" else nombres[5], "falla",
                                   "conecta pero se queda colgado"))

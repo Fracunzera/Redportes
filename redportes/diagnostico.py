@@ -120,8 +120,19 @@ def https(host: str = URL_HTTPS[0], ruta: str = URL_HTTPS[1], timeout: float = 6
         c.request("GET", ruta, headers={"User-Agent": "redportes"})
         estado = c.getresponse().status
         c.close()
+    except ssl.SSLCertVerificationError as e:
+        from redportes.pagina import clasificar_certificado
+
+        clase, nombre = clasificar_certificado(host)
+        if clase == "publica":
+            return {"ok": False, "certificado": "local",
+                    "error": f"el equipo no confía en el certificado de {nombre} (faltan certificados raíz "
+                             "o la fecha/hora está mal)"}
+        if clase == "proxy":
+            return {"ok": False, "certificado": "proxy", "error": f"{nombre} intercepta la conexión segura"}
+        return {"ok": False, "certificado": "?", "error": f"certificado no válido ({e.verify_message})"}
     except ssl.SSLError as e:
-        return {"ok": False, "error": f"certificado o TLS interceptado ({e.reason})"}
+        return {"ok": False, "error": f"error de TLS ({e.reason})"}
     except OSError as e:
         return {"ok": False, "error": _error_amigable(e)}
     ms = round((time.monotonic() - inicio) * 1000)
@@ -219,7 +230,13 @@ def evaluar(gw: str, p_gw: dict | None, p_inet: dict[str, dict], dns_cfg: list[d
     # Navegación
     pruebas.append(Prueba("Navegación HTTPS (google.com)", "ok" if web["ok"] else "falla",
                           f"{web['ms']} ms" if web["ok"] else web["error"]))
-    if not web["ok"] and dns_ref["ok"] and any(p["recibidos"] for p in p_inet.values()):
+    if not web["ok"] and web.get("certificado") == "local":
+        concl.append("Este equipo no confía en los certificados de los sitios: revisá la fecha y hora y "
+                     "actualizá los certificados raíz del sistema. La red no tiene la culpa.")
+    elif not web["ok"] and web.get("certificado") == "proxy":
+        concl.append(f"Un firewall o antivirus de la red intercepta HTTPS ({web['error']}): hay que instalar su "
+                     "certificado en el equipo o excluir los sitios de la inspección.")
+    elif not web["ok"] and dns_ref["ok"] and any(p["recibidos"] for p in p_inet.values()):
         concl.append("Hay conexión, pero no se puede navegar por HTTPS: puede haber un proxy, un portal "
                      "cautivo (Wi-Fi de hotel/bar) o un firewall que intercepta.")
 
