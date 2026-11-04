@@ -38,6 +38,12 @@ def carpeta_informes() -> Path:
         d.mkdir(parents=True, exist_ok=True)
         return d
     docs = Path.home() / "Documents"
+    if not ES_WINDOWS and not ES_MAC:
+        from redportes.sistema import ejecutar, tiene
+
+        xdg = ejecutar(["xdg-user-dir", "DOCUMENTS"]).strip() if tiene("xdg-user-dir") else ""
+        if xdg and Path(xdg).exists() and Path(xdg) != Path.home():
+            docs = Path(xdg)  # «Documentos» en un escritorio en castellano
     if not docs.exists():
         docs = Path.home() / "Documentos" if (Path.home() / "Documentos").exists() else Path.home()
     d = docs / "Redportes"
@@ -118,6 +124,8 @@ class App:
         herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
         herr.add_separator()
         herr.add_command(label="Abrir la carpeta de informes", command=lambda: abrir(carpeta_informes()))
+        if not ES_WINDOWS and not ES_MAC:
+            herr.add_command(label="Agregar Redportes al menú de aplicaciones", command=self.agregar_al_menu)
         barra.add_cascade(label="Herramientas", menu=herr)
 
         ayuda = tk.Menu(barra, tearoff=0)
@@ -135,6 +143,17 @@ class App:
         ayuda.add_command(label="Acerca de Redportes", command=self._acerca_de)
         barra.add_cascade(label="Ayuda", menu=ayuda)
         self.raiz.configure(menu=barra)
+
+    def agregar_al_menu(self):
+        from redportes import escritorio
+
+        try:
+            ruta = escritorio.instalar_acceso()
+        except (OSError, RuntimeError) as e:
+            messagebox.showerror("Redportes", f"No se pudo crear el acceso: {e}")
+            return
+        messagebox.showinfo("Redportes", "Listo: Redportes aparece en el menú de aplicaciones "
+                            f"(puede tardar unos segundos).\n\n{ruta}")
 
     def _cambiar_aviso_auto(self):
         from redportes import config
@@ -1173,6 +1192,12 @@ def _modo_programado(args: list[str]) -> int:
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--programado":
         return _modo_programado(sys.argv[2:])
+    if len(sys.argv) > 1 and not ES_WINDOWS:
+        # En Linux/macOS el mismo ejecutable (por ejemplo el AppImage) sirve de consola:
+        # ./Redportes.AppImage escanear -c "Oficina"
+        from redportes import cli
+
+        return cli.main(sys.argv[1:])
     if ES_WINDOWS:
         try:  # nitidez en pantallas con escala
             import ctypes
@@ -1180,7 +1205,7 @@ def main() -> int:
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:  # noqa: BLE001
             pass
-    raiz = tk.Tk()
+    raiz = tk.Tk(className="Redportes")
     App(raiz)
     raiz.mainloop()
     return 0

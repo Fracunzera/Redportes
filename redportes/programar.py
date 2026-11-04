@@ -22,7 +22,11 @@ def nombre_tarea(cliente: str, red: str) -> str:
 
 def comando_base() -> list[str]:
     """Cómo invocar Redportes en modo consola desde una tarea programada."""
-    if getattr(sys, "frozen", False):  # ejecutable de Windows (PyInstaller)
+    import os
+
+    if os.environ.get("APPIMAGE"):  # AppImage de Linux: la ruta del archivo, no la del montaje temporal
+        return [os.environ["APPIMAGE"], "--programado"]
+    if getattr(sys, "frozen", False):  # ejecutable empaquetado (PyInstaller)
         return [sys.executable, "--programado"]
     py = Path(sys.executable)
     if ES_WINDOWS and py.with_name("pythonw.exe").exists():

@@ -1,4 +1,4 @@
-name: instalador-windows
+name: instaladores
 
 on:
   release:
@@ -123,7 +123,7 @@ jobs:
           v = "${{ steps.v.outputs.version }}"
           texto = open("CHANGELOG.md", encoding="utf-8").read()
           m = re.search(rf"^## \[{re.escape(v)}\][^\n]*\n(.*?)(?=^## \[|\Z)", texto, re.S | re.M)
-          cuerpo = (m.group(1).strip() if m else "") + "\n\n**Descargas:** `Redportes-Windows-instalador.exe` (instalador) o `Redportes-Windows-portable.zip` (sin instalar). Si Windows muestra «protegió su PC», tocá *Más información* → *Ejecutar de todas formas*."
+          cuerpo = (m.group(1).strip() if m else "") + "\n\n**Descargas:** `Redportes-Windows-instalador.exe` (instalador), `Redportes-Windows-portable.zip` (sin instalar) o `Redportes-Linux-x86_64.AppImage` (Linux). Si Windows muestra «protegió su PC», tocá *Más información* → *Ejecutar de todas formas*."
           open("notas.md", "w", encoding="utf-8").write(cuerpo)
 
       - name: Publicar en Releases
@@ -135,3 +135,103 @@ jobs:
           files: |
             dist/release/Redportes-Windows-instalador.exe
             dist/release/Redportes-Windows-portable.zip
+
+  linux:
+    runs-on: ubuntu-22.04   # glibc 2.35: el AppImage corre en Debian 12, Ubuntu 22.04+, Mint 21+, Fedora 36+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Paquetes del sistema
+        run: sudo apt-get update && sudo apt-get install -y libtk8.6 xvfb file
+
+      - name: Última base de fabricantes guardada
+        uses: actions/cache/restore@v4
+        with:
+          path: redportes/recursos/oui.csv
+          key: oui-linux-${{ github.run_id }}
+          restore-keys: |
+            oui-
+
+      - name: Base de fabricantes (IEEE)
+        continue-on-error: true
+        timeout-minutes: 6
+        shell: python
+        run: |
+          import sys, time
+          sys.path.insert(0, ".")
+          from pathlib import Path
+          from redportes import oui
+          oui.URL_WIRESHARK = ""
+          for intento in range(4):
+              try:
+                  print(oui.actualizar_base(Path("redportes/recursos/oui.csv")), "fabricantes")
+                  break
+              except Exception as e:
+                  print("intento", intento + 1, "falló:", e)
+                  time.sleep(20)
+
+      - name: Dependencias
+        run: pip install . pyinstaller pytest
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Ejecutable (PyInstaller)
+        run: >
+          pyinstaller --noconfirm --name redportes
+          --add-data "redportes/recursos:redportes/recursos"
+          empaquetado/redportes_gui.py
+
+      - name: AppImage
+        run: |
+          set -e
+          APPDIR=AppDir
+          mkdir -p $APPDIR/usr/lib
+          cp -r dist/redportes $APPDIR/usr/lib/redportes
+          cp redportes/recursos/icono.png $APPDIR/redportes.png
+          cat > $APPDIR/redportes.desktop <<'DESK'
+          [Desktop Entry]
+          Type=Application
+          Name=Redportes
+          GenericName=Escáner de red
+          Comment=Mapa de la red, qué es cada equipo, qué revisar e informes
+          Exec=redportes
+          Icon=redportes
+          Terminal=false
+          Categories=Network;System;Utility;
+          StartupWMClass=Redportes
+          DESK
+          sed -i 's/^          //' $APPDIR/redportes.desktop
+          printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/lib/redportes/redportes" "$@"\n' > $APPDIR/AppRun
+          chmod +x $APPDIR/AppRun
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          mkdir -p dist/release
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool $APPDIR dist/release/Redportes-Linux-x86_64.AppImage
+          ls -la dist/release
+
+      - name: Probar el AppImage (consola y ventana)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          ./dist/release/Redportes-Linux-x86_64.AppImage --version
+          set +e
+          timeout 12 xvfb-run -a ./dist/release/Redportes-Linux-x86_64.AppImage
+          codigo=$?
+          set -e
+          if [ "$codigo" -ne 124 ]; then echo "La ventana se cerró sola (código $codigo)"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Redportes-Linux
+          path: dist/release/Redportes-Linux-x86_64.AppImage
+
+      - name: Publicar en Releases
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/Redportes-Linux-x86_64.AppImage

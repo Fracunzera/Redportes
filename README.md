@@ -18,17 +18,21 @@
   <a href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Windows-portable.zip">
     <img src="https://img.shields.io/badge/%E2%AC%87%20VERSI%C3%93N%20PORTABLE-sin%20instalar-0f172a?style=for-the-badge" alt="Descargar versión portable" height="44">
   </a>
+  &nbsp;
+  <a href="https://github.com/Fracunzera/Redportes/releases/latest/download/Redportes-Linux-x86_64.AppImage">
+    <img src="https://img.shields.io/badge/%E2%AC%87%20LINUX-AppImage-16a34a?style=for-the-badge" alt="Descargar para Linux (AppImage)" height="44">
+  </a>
 </p>
 
 <p align="center">
-  <sub>Gratis y de código abierto (MIT) · Windows 10/11 · también Linux y macOS ·
+  <sub>Gratis y de código abierto (MIT) · Windows 10/11 · Linux (AppImage) · macOS con pip ·
   <a href="https://github.com/Fracunzera/Redportes/releases">versiones anteriores</a> ·
   <a href="https://redportes.blucaro.site">sitio web</a></sub>
 </p>
 
 ---
 
-## Cómo descargarlo e instalarlo (Windows)
+## Cómo descargarlo e instalarlo
 
 No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
 
@@ -45,6 +49,13 @@ No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
 1. Tocá **«Versión portable»**. Se baja `Redportes-Windows-portable.zip`.
 2. Hacé clic derecho sobre el archivo → **Extraer todo…** (en el pendrive o donde quieras).
 3. Entrá a la carpeta y abrí **`Redportes.exe`**. El historial y los informes se guardan dentro de esa misma carpeta.
+
+**Linux — AppImage** (Debian 12, Ubuntu 22.04 o más nuevo, Mint, Fedora…)
+
+1. Tocá **«Linux»**. Se baja `Redportes-Linux-x86_64.AppImage`.
+2. Dale permiso de ejecución: clic derecho → *Propiedades* → *Permisos* → **Permitir ejecutar como programa**. O en la terminal: `chmod +x Redportes-Linux-x86_64.AppImage`.
+3. Doble clic para abrirlo. Para que quede en el menú del escritorio: **Herramientas → Agregar Redportes al menú de aplicaciones**.
+4. El mismo archivo sirve por consola: `./Redportes-Linux-x86_64.AppImage escanear -c "Oficina"`.
 
 **Para usarlo:** escribí el nombre del cliente o del lugar, tocá **Escanear** y esperá un minuto. Después tocá **Abrir informe**.
 
@@ -86,7 +97,7 @@ No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
 
 ### Windows
 
-Ver [Cómo descargarlo e instalarlo](#cómo-descargarlo-e-instalarlo-windows), arriba de todo. Los informes se guardan en `Documentos\Redportes` (o en la carpeta `Informes` de la versión portable).
+Ver [Cómo descargarlo e instalarlo](#cómo-descargarlo-e-instalarlo), arriba de todo. Los informes se guardan en `Documentos\Redportes` (o en la carpeta `Informes` de la versión portable).
 
 ### Línea de comandos (Linux, Windows, macOS)
 
@@ -100,7 +111,7 @@ pipx install git+https://github.com/Fracunzera/Redportes
 pip install git+https://github.com/Fracunzera/Redportes
 ```
 
-Esto instala también `redportes-gui`, la misma interfaz gráfica (en Linux necesita el paquete `python3-tk`).
+Esto instala también `redportes-gui`, la misma interfaz gráfica (en Linux necesita el paquete `python3-tk`). En Linux es más fácil el AppImage: no necesita Python.
 
 **Opcional pero recomendado:** instalar [nmap](https://nmap.org/download.html) (`sudo apt install nmap`). Redportes lo usa para el descubrimiento si está; si no, todo funciona igual con Python puro (ping, TCP y tabla ARP).
 

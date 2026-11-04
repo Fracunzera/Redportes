@@ -2,6 +2,12 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.9.0] - 2026-11-04
+- **Linux con ventana:** `Redportes-Linux-x86_64.AppImage`, un solo archivo que se abre con doble clic en Debian 12, Ubuntu 22.04+, Mint o Fedora. No necesita Python. Es la misma interfaz que en Windows.
+- **Herramientas → Agregar Redportes al menú de aplicaciones** (Linux).
+- El AppImage también sirve por consola: `./Redportes-Linux-x86_64.AppImage escanear …`, y los escaneos programados con cron apuntan al archivo.
+- En Linux los informes van a la carpeta de documentos del escritorio («Documentos» en castellano).
+
 ## [0.8.1] - 2026-11-03
 - Barra de menú. **Ayuda → Buscar actualizaciones** consulta en el momento y ofrece descargar la versión nueva; **Ayuda → Avisar de versiones nuevas al abrir** prende o apaga el aviso automático cuando quieras.
 - **Ayuda:** sitio web, reportar un error, qué hay de nuevo y «Acerca de» (muestra dónde se guardan los datos y los informes).
