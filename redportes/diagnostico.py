@@ -116,7 +116,9 @@ def resolver_sistema(nombre: str = NOMBRE_PRUEBA) -> dict:
 def https(host: str = URL_HTTPS[0], ruta: str = URL_HTTPS[1], timeout: float = 6) -> dict:
     inicio = time.monotonic()
     try:
-        c = http.client.HTTPSConnection(host, 443, timeout=timeout, context=ssl.create_default_context())
+        from redportes.sistema import contexto_ssl
+
+        c = http.client.HTTPSConnection(host, 443, timeout=timeout, context=contexto_ssl())
         c.request("GET", ruta, headers={"User-Agent": "redportes"})
         estado = c.getresponse().status
         c.close()
@@ -130,7 +132,8 @@ def https(host: str = URL_HTTPS[0], ruta: str = URL_HTTPS[1], timeout: float = 6
                              "o la fecha/hora está mal)"}
         if clase == "proxy":
             return {"ok": False, "certificado": "proxy", "error": f"{nombre} intercepta la conexión segura"}
-        return {"ok": False, "certificado": "?", "error": f"certificado no válido ({e.verify_message})"}
+        return {"ok": False, "certificado": "?",
+                "error": f"certificado no válido ({getattr(e, 'verify_message', '') or e})"}
     except ssl.SSLError as e:
         return {"ok": False, "error": f"error de TLS ({e.reason})"}
     except OSError as e:

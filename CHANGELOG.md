@@ -3,6 +3,7 @@
 Todas las versiones de Redportes. La más nueva, arriba.
 
 ## [0.12.0] - 2026-11-04
+- **Arreglo importante en Windows:** «Actualizar ahora» (y otras conexiones seguras: IP pública, Shodan, Telegram, diagnóstico) podía fallar con «unable to get issuer certificate». Ahora los certificados se validan con el verificador del propio sistema operativo, como el navegador.
 - Firma «hecho por Fracunzera» en los informes (también el mensual y el de compartir), en la ventana, en «Acerca de», en los avisos de Telegram, en `redportes --version`, en el sitio y en el README.
 
 ## [0.11.0] - 2026-11-04

@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from redportes.sistema import abrir_url
 
 
 API = "https://api.telegram.org"
@@ -53,7 +54,7 @@ def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float =
     cuerpo = urllib.parse.urlencode(datos).encode() if datos else None
     req = urllib.request.Request(url, data=cuerpo, headers={"User-Agent": "redportes"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_url(req, timeout=timeout) as r:
             res = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         try:

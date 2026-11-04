@@ -13,6 +13,7 @@ import socket
 import struct
 import urllib.request
 from urllib.parse import urljoin
+from redportes.sistema import abrir_url
 
 _SERVICIOS = ("WANIPConnection", "WANPPPConnection")
 _IPV4 = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
@@ -43,7 +44,7 @@ def _soap_ip_externa(tipo: str, control: str, timeout: float) -> str:
         "SOAPAction": f'"{tipo}#GetExternalIPAddress"',
         "User-Agent": "redportes",
     })
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with abrir_url(req, timeout=timeout) as r:
         texto = r.read(65536).decode("utf-8", errors="replace")
     m = re.search(r"<NewExternalIPAddress>\s*([^<]*?)\s*</NewExternalIPAddress>", texto, re.I)
     ip = m.group(1) if m else ""
@@ -53,7 +54,7 @@ def _soap_ip_externa(tipo: str, control: str, timeout: float) -> str:
 def por_upnp(ubicaciones: list[str], timeout: float = 4) -> str:
     for url in ubicaciones:
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "redportes"}),
+            with abrir_url(urllib.request.Request(url, headers={"User-Agent": "redportes"}),
                                         timeout=timeout) as r:
                 desc = r.read(262144).decode("utf-8", errors="replace")
         except Exception:

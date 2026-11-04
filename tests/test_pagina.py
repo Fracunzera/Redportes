@@ -113,7 +113,7 @@ def test_ip_publica_con_respaldo(monkeypatch):
 
     from redportes import internet
 
-    def abrir(req, timeout=0):
+    def abrir(req, timeout=0, **k):
         if "ipify" in req.full_url:
             raise OSError("bloqueado")
         if "icanhazip" in req.full_url:
@@ -142,7 +142,7 @@ def test_ip_vista_por_proveedor(monkeypatch):
 
     from redportes import internet
 
-    def abrir(req, timeout=0):
+    def abrir(req, timeout=0, **k):
         u = req.full_url
         if u.endswith(".com.ar/"):
             return io.BytesIO(b"<html>Tu IP: 170.233.31.217</html>")  # pública: no sirve
@@ -161,7 +161,7 @@ def test_proveedor_fuera_de_su_red(monkeypatch):
     from redportes import internet
 
     monkeypatch.setattr(internet.urllib.request, "urlopen",
-                        lambda req, timeout=0: io.BytesIO(b"IP 200.45.10.20"))
+                        lambda req, timeout=0, **k: io.BytesIO(b"IP 200.45.10.20"))
     assert internet.ip_vista_por_proveedor() is None
 
 

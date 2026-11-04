@@ -62,6 +62,29 @@ def entorno_sistema() -> dict | None:
 _preparar_entorno()
 
 
+def contexto_ssl():
+    """Contexto TLS que valida con el verificador del sistema operativo, como el navegador.
+
+    En Windows es clave: los certificados raíz se bajan a demanda y OpenSSL no los ve hasta que
+    Windows los usó, lo que daba «unable to get issuer certificate» (por ejemplo, al actualizar).
+    """
+    import ssl
+
+    try:
+        import truststore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:  # noqa: BLE001 — sin truststore (Python < 3.10)
+        return ssl.create_default_context()
+
+
+def abrir_url(req, timeout: float = 10, data=None):
+    """urllib.request.urlopen validando HTTPS con el sistema operativo."""
+    import urllib.request
+
+    return urllib.request.urlopen(req, data=data, timeout=timeout, context=contexto_ssl())
+
+
 def ejecutar_detallado(cmd: list[str], timeout: float = 10, encoding: str | None = None,
                        cancelado=None) -> tuple[str, str]:
     """Ejecuta un comando. Devuelve (salida, estado) con estado 'ok', 'tiempo', 'cancelado' o 'error'.

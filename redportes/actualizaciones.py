@@ -8,6 +8,7 @@ import time
 import urllib.request
 
 from redportes import __version__
+from redportes.sistema import abrir_url
 
 REPO = "Fracunzera/Redportes"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
@@ -29,7 +30,7 @@ def consultar(timeout: float = 6) -> dict | None:
     """{'version', 'url', 'notas'} de la última release, o None si no se pudo consultar."""
     req = urllib.request.Request(API, headers={"User-Agent": "redportes", "Accept": "application/vnd.github+json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_url(req, timeout=timeout) as r:
             d = json.loads(r.read().decode())
     except Exception:  # noqa: BLE001
         return None

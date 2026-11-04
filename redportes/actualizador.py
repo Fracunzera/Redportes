@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 from redportes.sistema import ES_WINDOWS, carpeta_programa, entorno_sistema, es_portable
+from redportes.sistema import abrir_url
 
 ARCHIVOS = {
     "appimage": "Redportes-Linux-x86_64.AppImage",
@@ -52,7 +53,7 @@ def descargar(url: str, destino: Path, tamano: int, progreso=lambda hecho, total
               cancelado=lambda: False) -> Path:
     req = urllib.request.Request(url, headers={"User-Agent": "redportes"})
     hecho = 0
-    with urllib.request.urlopen(req, timeout=30) as r, destino.open("wb") as f:
+    with abrir_url(req, timeout=30) as r, destino.open("wb") as f:
         total = int(r.headers.get("Content-Length") or tamano or 0)
         while True:
             if cancelado():

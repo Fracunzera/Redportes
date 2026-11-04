@@ -16,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from redportes.sistema import carpeta_datos
+from redportes.sistema import abrir_url
 
 URL_IEEE = "https://standards-oui.ieee.org/oui/oui.csv"
 
@@ -110,7 +111,7 @@ _UA = "Mozilla/5.0 (compatible; redportes; +https://github.com/Fracunzera/Redpor
 
 def _bajar(url: str, timeout: float) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with abrir_url(req, timeout=timeout) as r:
         return r.read().decode("utf-8", errors="replace")
 
 

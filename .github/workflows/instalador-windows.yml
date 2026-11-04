@@ -56,6 +56,9 @@ jobs:
       - name: Tests
         run: pytest -q
 
+      - name: Probar HTTPS con el verificador de Windows (descarga real desde GitHub)
+        run: python -c "from redportes.sistema import abrir_url, contexto_ssl; print(type(contexto_ssl())); print(len(abrir_url('https://github.com/Fracunzera/Redportes/releases/latest', timeout=30).read(2000)))"
+
       - name: Versión
         id: v
         shell: bash
@@ -64,6 +67,7 @@ jobs:
       - name: Ejecutable (PyInstaller)
         run: >
           pyinstaller --noconfirm --windowed --name Redportes
+          --hidden-import truststore
           --icon redportes/recursos/icono.ico
           --add-data "redportes/recursos;redportes/recursos"
           empaquetado/redportes_gui.py
@@ -196,6 +200,7 @@ jobs:
       - name: Ejecutable (PyInstaller)
         run: >
           pyinstaller --noconfirm --name redportes
+          --hidden-import truststore
           --add-data "redportes/recursos:redportes/recursos"
           empaquetado/redportes_gui.py
 

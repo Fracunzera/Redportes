@@ -14,6 +14,7 @@ import urllib.request
 
 from redportes.red import es_cgnat, es_privada
 from redportes.sistema import ES_WINDOWS, ejecutar, tiene
+from redportes.sistema import abrir_url
 
 DESTINO = "8.8.8.8"
 _IPV4 = r"(?:\d{1,3}\.){3}\d{1,3}"
@@ -124,7 +125,7 @@ def ip_publica() -> str:
     for url in SERVICIOS_IP:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
-            with urllib.request.urlopen(req, timeout=6) as r:
+            with abrir_url(req, timeout=6) as r:
                 texto = r.read(200000).decode("utf-8", errors="replace")
         except Exception:
             continue
@@ -176,7 +177,7 @@ def consultar_internetdb(ip: str) -> dict | None:
     try:
         req = urllib.request.Request(f"https://internetdb.shodan.io/{ip}",
                                      headers={"User-Agent": "redportes"})
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with abrir_url(req, timeout=10) as r:
             datos = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         return {} if e.code == 404 else None
@@ -292,7 +293,7 @@ def ip_vista_por_proveedor(extra: list[str] | None = None, timeout: float = 4,
         url = base + ruta
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (redportes)"})
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with abrir_url(req, timeout=timeout) as r:
                 texto = r.read(300000).decode("utf-8", errors="replace")
         except urllib.error.HTTPError:
             continue          # esa ruta no existe en ese servidor: probar la siguiente

@@ -112,7 +112,9 @@ def explicar_certificado(error: str, clase: str, nombre: str) -> tuple[str, list
 
 def probar_https(dominio: str, ip: str, timeout: float = 10) -> dict:
     """Handshake TLS validando el certificado y pedido HTTP. Lee hasta 256 KB para detectar cuelgues (MTU)."""
-    ctx = ssl.create_default_context()
+    from redportes.sistema import contexto_ssl
+
+    ctx = contexto_ssl()
     inicio = time.monotonic()
     try:
         s = socket.create_connection((ip, 443), timeout=timeout)
@@ -122,7 +124,8 @@ def probar_https(dominio: str, ip: str, timeout: float = 10) -> dict:
         t = ctx.wrap_socket(s, server_hostname=dominio)
     except ssl.SSLCertVerificationError as e:
         s.close()
-        return {"etapa": "certificado", "error": e.verify_message or str(e), "codigo": e.verify_code}
+        return {"etapa": "certificado", "error": getattr(e, "verify_message", "") or str(e),
+                "codigo": getattr(e, "verify_code", None)}
     except (socket.timeout, TimeoutError):
         s.close()
         return {"etapa": "tls", "error": "colgado", "colgado": True}
