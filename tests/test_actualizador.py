@@ -64,7 +64,11 @@ def test_appimage(monkeypatch, tmp_path, servidor):
     prep = actualizador.preparar(info, lambda h, t: progreso.append((h, t)))
     assert actual.read_bytes() == b"viejo"  # todavía no se reemplazó
     actualizador.aplicar(prep)
-    assert actual.read_bytes() == b"nuevo" * 1000 and actual.stat().st_mode & 0o111
+    import sys
+
+    assert actual.read_bytes() == b"nuevo" * 1000
+    if sys.platform != "win32":  # el permiso de ejecución solo existe en Linux/macOS
+        assert actual.stat().st_mode & 0o111
     assert lanzados == [[str(actual)]] and progreso[-1][0] == 5000
 
 
