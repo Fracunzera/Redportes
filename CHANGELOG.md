@@ -2,6 +2,12 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.8.1] - 2026-11-03
+- Barra de menú. **Ayuda → Buscar actualizaciones** consulta en el momento y ofrece descargar la versión nueva; **Ayuda → Avisar de versiones nuevas al abrir** prende o apaga el aviso automático cuando quieras.
+- **Ayuda:** sitio web, reportar un error, qué hay de nuevo y «Acerca de» (muestra dónde se guardan los datos y los informes).
+- **Herramientas:** Automatizar, inventario, carpeta de informes y actualizar la lista de fabricantes.
+- Arreglo: el aviso de versión nueva podía fallar al mostrarse.
+
 ## [0.8.0] - 2026-11-03
 - **¿No abre una página?** En la pestaña Diagnóstico pegás la dirección y Redportes prueba en orden: si anda Internet, el DNS (compara los de la PC con Cloudflare, Google, Quad9 y OpenDNS), el archivo hosts, la conexión al sitio, HTTPS y certificado, la respuesta del sitio y el MTU. Se frena en la primera que falla y lo explica en una frase, con qué hacer.
 - Detecta caché DNS vieja (y cuánto le queda), bloqueos de AdGuard/Pi-hole, proxies que interceptan HTTPS, certificados vencidos, sitios caídos y MTU bajo (con el comando para MikroTik y Windows).

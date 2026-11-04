@@ -96,6 +96,7 @@ class App:
         self.b_bajar = ttk.Button(self.banner, text="Descargar")
         self.b_bajar.pack(side="right", padx=4, pady=4)
 
+        self._armar_menu()
         self._armar_formulario()
         self._armar_pie()        # se empaqueta antes que las pestañas para que siempre quede visible
         self._armar_pestanas()
@@ -107,8 +108,91 @@ class App:
 
     # ------------------------------------------------------------ armado
 
+    def _armar_menu(self):
+        from redportes import config
+
+        barra = tk.Menu(self.raiz)
+        herr = tk.Menu(barra, tearoff=0)
+        herr.add_command(label="Automatizar (Telegram y escaneo diario)…", command=self.abrir_automatizar)
+        herr.add_command(label="Exportar inventario (Excel)…", command=self.exportar_inventario)
+        herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
+        herr.add_separator()
+        herr.add_command(label="Abrir la carpeta de informes", command=lambda: abrir(carpeta_informes()))
+        barra.add_cascade(label="Herramientas", menu=herr)
+
+        ayuda = tk.Menu(barra, tearoff=0)
+        ayuda.add_command(label="Buscar actualizaciones", command=self.buscar_actualizaciones)
+        self.v_aviso_auto = tk.BooleanVar(value=bool(config.leer().get("actualizaciones", {}).get("activado")))
+        ayuda.add_checkbutton(label="Avisar de versiones nuevas al abrir", variable=self.v_aviso_auto,
+                              command=self._cambiar_aviso_auto)
+        ayuda.add_separator()
+        ayuda.add_command(label="Sitio de Redportes", command=lambda: webbrowser.open("https://redportes.blucaro.site"))
+        ayuda.add_command(label="Reportar un error o proponer una idea",
+                          command=lambda: webbrowser.open("https://github.com/Fracunzera/Redportes/issues/new/choose"))
+        ayuda.add_command(label="Qué hay de nuevo",
+                          command=lambda: webbrowser.open("https://github.com/Fracunzera/Redportes/blob/main/CHANGELOG.md"))
+        ayuda.add_separator()
+        ayuda.add_command(label="Acerca de Redportes", command=self._acerca_de)
+        barra.add_cascade(label="Ayuda", menu=ayuda)
+        self.raiz.configure(menu=barra)
+
+    def _cambiar_aviso_auto(self):
+        from redportes import config
+
+        cfg = config.leer()
+        cfg.setdefault("actualizaciones", {})["activado"] = self.v_aviso_auto.get()
+        config.guardar(cfg)
+        self.v_estado.set("Aviso de versiones nuevas " + ("activado." if self.v_aviso_auto.get() else "desactivado."))
+
+    def buscar_actualizaciones(self):
+        self.v_estado.set("Buscando actualizaciones…")
+
+        def trabajo():
+            from redportes import actualizaciones
+
+            self.cola.put(("buscada", actualizaciones.consultar()))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _resultado_busqueda(self, info: dict | None):
+        from redportes import actualizaciones, config
+        from redportes.sistema import es_portable
+
+        if info is None:
+            self.v_estado.set("No se pudo consultar GitHub.")
+            if messagebox.askyesno("Buscar actualizaciones", "No se pudo consultar si hay una versión nueva "
+                                   "(¿hay Internet?).\n\n¿Querés abrir la página de descargas?"):
+                webbrowser.open(actualizaciones.PAGINA)
+            return
+        cfg = config.leer()
+        cfg.setdefault("actualizaciones", {}).update(ultima_version=info["version"])
+        config.guardar(cfg)
+        if not actualizaciones.es_mas_nueva(info["version"]):
+            self.v_estado.set(f"Tenés la última versión ({__version__}).")
+            messagebox.showinfo("Buscar actualizaciones", f"Tenés la última versión de Redportes ({__version__}).")
+            return
+        self._mostrar_nueva(info)
+        url = actualizaciones.DESCARGA_PORTABLE if es_portable() else actualizaciones.DESCARGA_INSTALADOR
+        cual = "el zip de la versión portable" if es_portable() else "el instalador"
+        if messagebox.askyesno("Hay una versión nueva",
+                               f"Salió Redportes {info['version']} (tenés la {__version__}).\n\n"
+                               f"¿Descargar {cual} ahora?"
+                               + ("" if es_portable() else "\nCuando termine, abrilo: se instala encima y "
+                                                           "conserva tu historial.")):
+            webbrowser.open(url)
+
+    def _acerca_de(self):
+        from redportes.sistema import carpeta_datos, es_portable
+
+        messagebox.showinfo(
+            "Acerca de Redportes",
+            f"Redportes {__version__}" + (" (portable)" if es_portable() else "") + "\n"
+            "Escáner de red gratis y de código abierto (licencia MIT).\n\n"
+            "https://redportes.blucaro.site\nhttps://github.com/Fracunzera/Redportes\n\n"
+            f"Datos e historial: {carpeta_datos()}\nInformes: {carpeta_informes()}")
+
     def _armar_formulario(self):
-        f = ttk.Frame(self.raiz, padding=(12, 12, 12, 6))
+        f = self.f_form = ttk.Frame(self.raiz, padding=(12, 12, 12, 6))
         f.pack(fill="x")
         for c in (1, 3):
             f.columnconfigure(c, weight=1)
@@ -298,8 +382,7 @@ class App:
                    command=lambda: abrir(carpeta_informes())).pack(side="left")
         ttk.Button(pie, text="Inventario (Excel)", command=self.exportar_inventario).pack(side="left", padx=6)
         ttk.Button(pie, text="Automatizar…", command=self.abrir_automatizar).pack(side="left")
-        self.b_oui = ttk.Button(pie, text="Actualizar fabricantes", command=self.actualizar_oui)
-        self.b_oui.pack(side="left", padx=6)
+
 
 
     # ------------------------------------------------------------ datos
@@ -406,6 +489,8 @@ class App:
                 if tipo == "progreso":
                     self.v_estado.set(dato)
                     self._log(dato)
+                elif tipo == "buscada":
+                    self._resultado_busqueda(dato)
                 elif tipo == "nueva":
                     self._mostrar_nueva(dato)
                 elif tipo == "local":
@@ -415,7 +500,6 @@ class App:
                 elif tipo == "diag":
                     self._mostrar_diagnostico(dato)
                 elif tipo == "oui":
-                    self.b_oui.configure(state="normal")
                     self.v_estado.set(dato)
                     self._log(dato)
                 elif tipo == "fin":
@@ -781,8 +865,10 @@ class App:
         if "activado" not in act:
             act["activado"] = messagebox.askyesno(
                 "Redportes", "¿Querés que Redportes te avise cuando salga una versión nueva?\n\n"
-                "Al abrirse consulta GitHub como mucho una vez por día. No envía ningún dato de tus redes.")
+                "Al abrirse consulta GitHub como mucho una vez por día. No envía ningún dato de tus redes.\n\n"
+                "Lo podés cambiar cuando quieras en Ayuda.")
             config.guardar(cfg)
+            self.v_aviso_auto.set(act["activado"])
         if not act["activado"]:
             return
 
@@ -806,7 +892,7 @@ class App:
                                      f"(tenés la {__version__}).")
         self.b_bajar.configure(command=lambda: webbrowser.open(url))
         self.b_notas.configure(command=lambda: webbrowser.open(info.get("url") or actualizaciones.PAGINA))
-        self.banner.pack(fill="x", before=self.raiz.winfo_children()[1])
+        self.banner.pack(fill="x", before=self.f_form)
 
     def _ofrecer_oui(self):
         """La primera vez, si no hay base completa de fabricantes, ofrece bajarla."""
@@ -830,8 +916,7 @@ class App:
                 + "Se va a bajar la base completa (unos 5 MB) de la IEEE o, si no responde, "
                 "de Wireshark. ¿Continuar?"):
             return
-        self.b_oui.configure(state="disabled")
-        self.v_estado.set("Bajando la base de fabricantes de la IEEE…")
+        self.v_estado.set("Bajando la base de fabricantes…")
 
         def trabajo():
             try:
