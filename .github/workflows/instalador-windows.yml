@@ -140,7 +140,18 @@ jobs:
           v = "${{ steps.v.outputs.version }}"
           texto = open("CHANGELOG.md", encoding="utf-8").read()
           m = re.search(rf"^## \[{re.escape(v)}\][^\n]*\n(.*?)(?=^## \[|\Z)", texto, re.S | re.M)
-          cuerpo = (m.group(1).strip() if m else "") + "\n\n**Descargas:** `Redportes-Windows-instalador.exe` (instalador), `Redportes-Windows-portable.zip` (sin instalar) o `Redportes-Linux-x86_64.AppImage` (Linux). Si Windows muestra «protegió su PC», tocá *Más información* → *Ejecutar de todas formas*."
+          base = "https://github.com/Fracunzera/Redportes/releases/latest/download/"
+          arriba = (
+              "### ⬇️ Descargar (no hace falta instalar Python)\n\n"
+              f"- **Windows:** [instalador]({base}Redportes-Windows-instalador.exe) · "
+              f"[portable, sin instalar]({base}Redportes-Windows-portable.zip)\n"
+              f"- **Linux:** [AppImage]({base}Redportes-Linux-x86_64.AppImage) "
+              "(clic derecho → Propiedades → Permitir ejecutar)\n\n"
+              "> Los archivos **Source code** que agrega GitHub abajo de todo son el código, para programadores: "
+              "no son el programa. Si Windows muestra «protegió su PC», tocá *Más información* → *Ejecutar de todas formas*.\n\n"
+              "### Qué hay de nuevo\n\n"
+          )
+          cuerpo = arriba + (m.group(1).strip() if m else "")
           open("notas.md", "w", encoding="utf-8").write(cuerpo)
 
       - name: Publicar en Releases

@@ -106,6 +106,8 @@ Ver [Cómo descargarlo e instalarlo](#cómo-descargarlo-e-instalarlo), arriba de
 
 ### Línea de comandos (Linux, Windows, macOS)
 
+> Solo para programadores o para macOS. **Para usarlo en Windows o Linux no hace falta Python:** bajá el instalador, el portable o el AppImage de los botones de arriba.
+
 Necesitás Python 3.9 o superior.
 
 ```bash
