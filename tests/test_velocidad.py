@@ -206,3 +206,37 @@ def test_ejecutar_hace_como_mucho_una_prueba_extra(monkeypatch):
     monkeypatch.setattr(v, "medir", medir)
     v.ejecutar(plan="300")
     assert llamados == ["Cloudflare", "fast.com"]
+
+
+def test_concluir_red_interna():
+    r = v.concluir({"internet": _medida("Cloudflare", 60, 40),
+                    "interno": _medida("speedtest.subinfo.local", 900, 900)})
+    assert any(p[0] == "Speedtest de tu red" for p in r["pasos"])
+    assert any("no el cableado" in q for q in r["que_hacer"])
+    r = v.concluir({"internet": _medida("Cloudflare", 90, 40),
+                    "interno": _medida("speedtest.subinfo.local", 94, 90)})
+    assert any("límite está en la red" in q for q in r["que_hacer"])
+
+
+def test_speedtest_interno_local():
+    s = _servidor()
+    try:
+        url = f"127.0.0.1:{s.server_address[1]}"      # sin http://: prueba https y después http
+        assert v.buscar_librespeed("x", "https://" + url, timeout=2) is None
+        assert v.buscar_librespeed("x", "http://" + url) is not None
+    finally:
+        s.shutdown()
+
+
+def test_resolver_local_por_dns(monkeypatch):
+    import socket
+
+    from redportes import consulta_dns, red
+
+    def falla(*a, **k):
+        raise socket.gaierror("mdns")
+    monkeypatch.setattr(socket, "getaddrinfo", falla)
+    monkeypatch.setattr(red, "servidores_dns", lambda: ["10.0.0.53"])
+    monkeypatch.setattr(consulta_dns, "consultar", lambda s, n: {"estado": "ok", "ips": ["10.1.2.3"]})
+    assert v.resolver_local("https://speedtest.subinfo.local") == ("https://10.1.2.3", "speedtest.subinfo.local")
+    assert v.resolver_local("https://speedtest.ejemplo.com") == ("https://speedtest.ejemplo.com", "")

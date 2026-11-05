@@ -334,9 +334,13 @@ def cmd_velocidad(args) -> int:
     cfg = config.leer()
     if args.plan:
         cfg["plan"] = args.plan
+    if args.interno is not None:
+        cfg["speedtest_interno"] = args.interno
+    if args.plan or args.interno is not None:
         config.guardar(cfg)
     r = velocidad.ejecutar(plan=args.plan or cfg.get("plan"), usar_ookla=args.ookla,
-                           url_proveedor=cfg.get("url_proveedor", ""), progreso=_progreso)
+                           url_proveedor=cfg.get("url_proveedor", ""), progreso=_progreso,
+                           url_interno=cfg.get("speedtest_interno", ""))
     print()
     print(velocidad.como_texto(r))
     return 0 if r["estado"] != "falla" else 1
@@ -457,6 +461,8 @@ def construir_parser() -> argparse.ArgumentParser:
 
     ve = sub.add_parser("velocidad", help="prueba de velocidad: Internet, hasta tu proveedor y latencia con carga")
     ve.add_argument("--plan", help="velocidad contratada en Mb/s, ej. 300 o 300/50 (se recuerda)")
+    ve.add_argument("--interno", metavar="URL", help="speedtest LibreSpeed de tu propia red, ej. "
+                    "speedtest.miempresa.local (se recuerda; \"\" para quitarlo)")
     ve.add_argument("--ookla", action="store_true", help="sumar la prueba oficial de Ookla si está instalada")
     ve.set_defaults(func=cmd_velocidad)
     sub.add_parser("equipo", help="configuración de esta computadora: red, Wi-Fi, sistema"

@@ -51,6 +51,7 @@ class Servidor:
         self.verificar = verificar
         self.por_http = False
         self.url_subida_fn = None     # fast.com: cada subida va a uno de sus servidores
+        self.nombre_host = ""         # si se entra por IP, el nombre original (cabecera Host)
 
     def contexto(self):
         if self.verificar:
@@ -151,15 +152,42 @@ def librespeed(nombre: str, base: str, ruta: str) -> Servidor:
 
 def _abrir(srv: Servidor, url: str, data=None, timeout: float = 8, cabeceras: dict | None = None):
     h = {"User-Agent": AGENTE, "Cache-Control": "no-cache"}
+    if srv.nombre_host:
+        h["Host"] = srv.nombre_host
     h.update(cabeceras or {})
     req = urllib.request.Request(url, data=data, headers=h, method="POST" if data is not None else "GET")
     return urllib.request.urlopen(req, timeout=timeout, context=srv.contexto())
 
 
+def resolver_local(base: str) -> tuple[str, str]:
+    """Nombres .local: en Linux con mDNS (Fedora, Ubuntu) el sistema no le pregunta al DNS de la red y
+    no los encuentra. Si pasa, se consulta directo a los DNS configurados. Devuelve (base, nombre_host)."""
+    p = urlsplit(base)
+    host = p.hostname or ""
+    if not host.endswith(".local"):
+        return base, ""
+    try:
+        socket.getaddrinfo(host, None)
+        return base, ""
+    except OSError:
+        pass
+    from redportes.consulta_dns import consultar
+    from redportes.red import servidores_dns
+
+    for dns in servidores_dns():
+        r = consultar(dns, host)
+        if r.get("estado") == "ok" and r.get("ips"):
+            red = r["ips"][0] + (f":{p.port}" if p.port else "")
+            return p._replace(netloc=red).geturl(), host + (f":{p.port}" if p.port else "")
+    return base, ""
+
+
 def buscar_librespeed(nombre: str, base: str, timeout: float = 4) -> Servidor | None:
     """Prueba dónde están garbage.php / empty.php en un speedtest LibreSpeed."""
+    base, nombre_host = resolver_local(base)
     for ruta in ("/backend", ""):
         srv = librespeed(nombre, base, ruta)
+        srv.nombre_host = nombre_host
         try:
             with _abrir(srv, srv.url_subida, timeout=timeout) as r:
                 r.read(1000)
@@ -437,6 +465,7 @@ def concluir(r: dict) -> dict:
     """Agrega estado, veredicto, qué hacer y la lista de pasos al resultado."""
     inet, prov, ook, plan, w = r.get("internet") or {}, r.get("proveedor"), r.get("ookla"), r.get("plan"), r.get("wifi") or {}
     fast = r.get("fast")
+    interno = r.get("interno")
     pasos, hacer = [], []
     estado = "ok"
 
@@ -450,7 +479,7 @@ def concluir(r: dict) -> dict:
     # a Cloudflare puede ser más lento que a Netflix, que suele tener servidores dentro del proveedor.
     candidatos = [m for m in (inet, fast, ook) if m and m.get("bajada")]
     principal = max(candidatos, key=lambda m: m["bajada"]) if candidatos else None
-    for m in (inet, fast, prov, ook):
+    for m in (inet, fast, prov, interno, ook):
         if not m:
             continue
         nombre = m["servidor"] if m is not inet else "Internet (Cloudflare)"
@@ -459,6 +488,8 @@ def concluir(r: dict) -> dict:
         prefijo = ""
         if m is prov:
             nombre, prefijo = "Hasta tu proveedor", f"{m['servidor']}: "
+        if m is interno:
+            nombre, prefijo = "Speedtest de tu red", f"{m['servidor']}: "
         if m.get("bajada") is None and m.get("error"):
             pasos.append((nombre, "omitido" if candidatos else "falla", m["error"]))
             continue
@@ -516,6 +547,19 @@ def concluir(r: dict) -> dict:
             pasos.append(("¿Dónde está el límite?", "info",
                           "hasta el proveedor y hacia Internet da parecido: el límite es tu conexión "
                           "(o la red/Wi-Fi de este lado)"))
+
+    # Red interna vs salida a Internet
+    if interno and interno.get("bajada") and bajada:
+        if interno["bajada"] > bajada * 1.5:
+            pasos.append(("Red interna vs Internet", "info",
+                          f"dentro de la red {_mbps(interno['bajada'])}, hacia Internet {_mbps(bajada)}"))
+            hacer.append(f"La red interna rinde ({_mbps(interno['bajada'])} hasta {interno['servidor']}): "
+                         f"lo que limita es la salida a Internet o el camino hacia afuera, no el cableado ni los switches.")
+        elif plan is None or interno["bajada"] < plan["bajada"] * 0.8:
+            pasos.append(("Red interna vs Internet", "aviso",
+                          f"dentro de la red también da {_mbps(interno['bajada'])}: el límite está de este lado"))
+            hacer.append("Hasta el speedtest de tu red da parecido que hacia Internet: el límite está en la red "
+                         "interna (Wi-Fi, un switch o enlace de 100 Mb/s, un cable) y no en la salida.")
 
     # Latencia con carga (bufferbloat)
     peor_carga = ("omitido", "sin datos")
@@ -580,7 +624,7 @@ def _detectar_proveedor(parar=None) -> list[dict]:
 
 
 def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progreso=None, parar=None,
-             duracion: float = DURACION) -> dict:
+             duracion: float = DURACION, url_interno: str = "") -> dict:
     """Siempre Cloudflare. Después, como mucho UNA prueba más, la que aporta:
     - si Cloudflare ya da ≥ 90% del plan, ninguna (no hay nada que explicar);
     - si se detecta el speedtest del proveedor, ese (dice si el plan llega completo);
@@ -589,7 +633,8 @@ def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progr
 
     aviso = progreso or (lambda _m: None)
     r = {"version": __version__, "autor": __autor__, "fecha": time.strftime("%Y-%m-%d %H:%M"),
-         "plan": leer_plan(plan), "internet": {}, "fast": None, "proveedor": None, "ookla": None, "wifi": {}}
+         "plan": leer_plan(plan), "internet": {}, "fast": None, "proveedor": None, "ookla": None, "wifi": {},
+         "interno": None}
 
     # Mientras mide Cloudflare, en paralelo: Wi-Fi y qué proveedor hay en el camino.
     previo: dict = {}
@@ -630,6 +675,17 @@ def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progr
             srv = fastcom()
             r["fast"] = (medir(srv, duracion=duracion, parar=parar, progreso=aviso) if srv else
                          {"servidor": "fast.com (Netflix)", "bajada": None, "error": "fast.com no respondió"})
+
+    # Speedtest de la propia red (lo configura el usuario): ¿rinde la red interna y el límite es la salida?
+    if url_interno and not alcanza and not (parar and parar()):
+        aviso("Probando el speedtest de tu red…")
+        nombre = urlsplit(url_interno if "://" in url_interno else "https://" + url_interno).hostname or url_interno
+        srv = buscar_librespeed(nombre, url_interno if "://" in url_interno else "https://" + url_interno)
+        if not srv and "://" not in url_interno:
+            srv = buscar_librespeed(nombre, "http://" + url_interno)
+        r["interno"] = (medir(srv, duracion=duracion, hilos=HILOS_PROVEEDOR, parar=parar, progreso=aviso) if srv else
+                        {"servidor": nombre, "bajada": None,
+                         "error": "no responde o no es un LibreSpeed (buscamos backend/garbage.php y empty.php)"})
 
     if usar_ookla and not (parar and parar()):
         ruta = ookla_disponible()

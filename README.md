@@ -149,6 +149,7 @@ redportes pagina https://www.ejemplo.com       # ¿por qué no abre esta página
 redportes equipo                               # configuración de esta computadora
 redportes internet                             # solo la salida a Internet (sin escanear la red)
 redportes velocidad --plan 300/50              # velocidad, latencia con carga y % del plan
+redportes velocidad --interno speedtest.miempresa.local   # suma el speedtest de tu propia red
 ```
 
 ## Redes grandes

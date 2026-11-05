@@ -5,6 +5,8 @@ Todas las versiones de Redportes. La más nueva, arriba.
 ## [0.13.2] - 2026-11-04
 - **Prueba de velocidad más corta (15 a 30 s):** siempre mide Cloudflare y, como mucho, una prueba más, la que aporta. Si ya llega el plan, ninguna; si se detecta el speedtest de tu proveedor, ese; si no, fast.com.
 - El proveedor se reconoce mientras corre la primera medición, primero por el nombre de tu IP pública (al instante) y solo si hace falta con un traceroute corto.
+- **Speedtest de tu red** (*Herramientas → Speedtest de mi red…* o `redportes velocidad --interno speedtest.miempresa.local`): si en tu red hay un LibreSpeed propio, la prueba lo suma y te dice si la red interna rinde y lo lento es la salida a Internet, o si el límite está adentro (un switch o enlace de 100 Mb/s, el Wi-Fi, un cable).
+- Los nombres `.local` se resuelven aunque Linux los mande a mDNS (Fedora, Ubuntu): si el sistema no los encuentra, se le pregunta directo al DNS de la red.
 - Nueva plantilla de GitHub **«Sumar mi proveedor de Internet»**: si tu proveedor tiene speedtest propio, pedí que lo agreguemos y todos sus clientes tienen la comparación «hasta tu proveedor».
 
 ## [0.13.1] - 2026-11-04

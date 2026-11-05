@@ -129,6 +129,7 @@ class App:
                              variable=self.v_usar_ookla, command=self._guardar_usar_ookla)
         herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
         herr.add_command(label="Página de mi proveedor que muestra la IP interna…", command=self.configurar_proveedor)
+        herr.add_command(label="Speedtest de mi red…", command=self.configurar_speedtest_red)
         herr.add_separator()
         herr.add_command(label="Abrir la carpeta de informes", command=lambda: abrir(carpeta_informes()))
         if not ES_WINDOWS and not ES_MAC:
@@ -180,6 +181,24 @@ class App:
         cfg["url_proveedor"] = url.strip()
         config.guardar(cfg)
         self.v_estado.set("Página del proveedor guardada: se usa al escanear con «salida a Internet».")
+
+    def configurar_speedtest_red(self):
+        from tkinter import simpledialog
+
+        from redportes import config
+
+        cfg = config.leer()
+        url = simpledialog.askstring(
+            "Speedtest de mi red",
+            "Si en tu red hay un speedtest propio (LibreSpeed), pegá su dirección, por ejemplo "
+            "speedtest.miempresa.local. La prueba de velocidad lo suma para saber si la red interna rinde "
+            "y lo lento es la salida a Internet.\n\nDejalo vacío para no usar ninguno.",
+            initialvalue=cfg.get("speedtest_interno", ""), parent=self.raiz)
+        if url is None:
+            return
+        cfg["speedtest_interno"] = url.strip()
+        config.guardar(cfg)
+        self.v_estado.set("Speedtest de tu red guardado: se usa en «Probar velocidad».")
 
     def _guardar_usar_ookla(self):
         from redportes import config, velocidad
@@ -1140,6 +1159,7 @@ class App:
             try:
                 r = velocidad.ejecutar(plan=plan, usar_ookla=cfg.get("usar_ookla", False),
                                        url_proveedor=cfg.get("url_proveedor", ""),
+                                       url_interno=cfg.get("speedtest_interno", ""),
                                        progreso=lambda m: self.cola.put(("progreso", m)), parar=ctl.cancelado)
                 self.cola.put(("velocidad", r))
             except Exception as e:  # noqa: BLE001
