@@ -2,6 +2,11 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.13.2] - 2026-11-04
+- **Prueba de velocidad más corta (15 a 30 s):** siempre mide Cloudflare y, como mucho, una prueba más, la que aporta. Si ya llega el plan, ninguna; si se detecta el speedtest de tu proveedor, ese; si no, fast.com.
+- El proveedor se reconoce mientras corre la primera medición, primero por el nombre de tu IP pública (al instante) y solo si hace falta con un traceroute corto.
+- Nueva plantilla de GitHub **«Sumar mi proveedor de Internet»**: si tu proveedor tiene speedtest propio, pedí que lo agreguemos y todos sus clientes tienen la comparación «hasta tu proveedor».
+
 ## [0.13.1] - 2026-11-04
 - **La prueba de velocidad ya no culpa al proveedor por los servidores lejanos.** Si hasta tu proveedor llega el plan completo, el resultado lo dice así («tu conexión da 290 Mb/s… a servidores lejanos: 60») y el % del plan se calcula con eso. Lejos, cada conexión rinde menos por la latencia; las descargas con muchas conexiones (Steam, actualizaciones) sí usan todo el plan.
 - Se suma **fast.com** (servidores de Netflix, que suelen estar dentro del proveedor o cerca). El número principal es el mejor de los servidores de Internet, marcado con ★.

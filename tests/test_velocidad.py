@@ -168,3 +168,41 @@ def test_concluir_todo_bien_y_sin_internet():
     assert r["estado"] == "ok"
     r = v.concluir({"internet": {"servidor": "Cloudflare", "bajada": None, "error": "No se pudo conectar"}})
     assert r["estado"] == "falla"
+
+
+def _falso_medir(valores):
+    llamados = []
+
+    def medir(srv, **k):
+        llamados.append(srv.nombre)
+        return _medida(srv.nombre, *valores.get(srv.nombre.split(" ")[0], (50, 10)))
+    return medir, llamados
+
+
+def test_ejecutar_hace_como_mucho_una_prueba_extra(monkeypatch):
+    from redportes import equipo_local
+
+    monkeypatch.setattr(equipo_local, "wifi", lambda: {})
+    monkeypatch.setattr(v, "fastcom", lambda: v.Servidor("fast.com", lambda n: "", "", "h", 443))
+    monkeypatch.setattr(v, "buscar_librespeed", lambda n, b: v.Servidor("SS", lambda n: "", "", "h", 443))
+
+    # Cloudflare alcanza el plan: nada más
+    monkeypatch.setattr(v, "_detectar_proveedor", lambda parar=None: [])
+    medir, llamados = _falso_medir({"Cloudflare": (290, 50)})
+    monkeypatch.setattr(v, "medir", medir)
+    v.ejecutar(plan="300")
+    assert llamados == ["Cloudflare"]
+
+    # Lento y con proveedor detectado: solo el proveedor
+    monkeypatch.setattr(v, "_detectar_proveedor", lambda parar=None: [{"nombre": "SS", "bases": ["https://x"]}])
+    medir, llamados = _falso_medir({"Cloudflare": (60, 40), "SS": (290, 290)})
+    monkeypatch.setattr(v, "medir", medir)
+    r = v.ejecutar(plan="300")
+    assert llamados == ["Cloudflare", "SS"] and r["estado"] == "ok"
+
+    # Lento y sin proveedor: fast.com
+    monkeypatch.setattr(v, "_detectar_proveedor", lambda parar=None: [])
+    medir, llamados = _falso_medir({"Cloudflare": (60, 40), "fast.com": (280, 40)})
+    monkeypatch.setattr(v, "medir", medir)
+    v.ejecutar(plan="300")
+    assert llamados == ["Cloudflare", "fast.com"]

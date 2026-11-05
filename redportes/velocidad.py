@@ -23,7 +23,7 @@ from redportes.sistema import contexto_ssl, ejecutar_detallado
 
 CLOUDFLARE = "https://speed.cloudflare.com"
 AGENTE = f"Mozilla/5.0 (redportes {__version__})"
-DURACION = 7.0          # segundos por sentido
+DURACION = 6.0          # segundos por sentido
 CALENTAMIENTO = 1.5     # lo primero no cuenta: TCP todavía está acelerando
 HILOS = 8               # hacia Internet: como Steam o fast.com, varias conexiones a la vez
 HILOS_PROVEEDOR = 4
@@ -563,50 +563,73 @@ def concluir(r: dict) -> dict:
 # ---------------------------------------------------------------- todo junto
 
 def _detectar_proveedor(parar=None) -> list[dict]:
-    """Proveedores conocidos en el camino (traceroute corto + DNS inverso)."""
+    """Proveedores conocidos en el camino: primero el nombre de la IP pública (instantáneo),
+    y solo si no alcanza, un traceroute corto."""
     from redportes import internet
 
+    publica = internet.ip_publica()
+    hallados = internet.proveedores_del_camino([], publica)
+    if hallados or (parar and parar()):
+        return hallados
     cmd = internet.comando_traza(saltos=8, rapido=True)
-    saltos = []
-    if cmd:
-        salida, _ = ejecutar_detallado(cmd, timeout=30, cancelado=parar)
-        saltos = internet.analizar_saltos(internet.parsear_traza(salida), "").get("saltos", [])
-    return internet.proveedores_del_camino(saltos, internet.ip_publica())
+    if not cmd:
+        return []
+    salida, _ = ejecutar_detallado(cmd, timeout=30, cancelado=parar)
+    saltos = internet.analizar_saltos(internet.parsear_traza(salida), "").get("saltos", [])
+    return internet.proveedores_del_camino(saltos, "")
 
 
 def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progreso=None, parar=None,
              duracion: float = DURACION) -> dict:
+    """Siempre Cloudflare. Después, como mucho UNA prueba más, la que aporta:
+    - si Cloudflare ya da ≥ 90% del plan, ninguna (no hay nada que explicar);
+    - si se detecta el speedtest del proveedor, ese (dice si el plan llega completo);
+    - si no, fast.com (servidores de Netflix, cercanos)."""
     from redportes import equipo_local
 
     aviso = progreso or (lambda _m: None)
     r = {"version": __version__, "autor": __autor__, "fecha": time.strftime("%Y-%m-%d %H:%M"),
          "plan": leer_plan(plan), "internet": {}, "fast": None, "proveedor": None, "ookla": None, "wifi": {}}
-    try:
-        r["wifi"] = equipo_local.wifi()
-    except Exception:  # noqa: BLE001
-        r["wifi"] = {}
+
+    # Mientras mide Cloudflare, en paralelo: Wi-Fi y qué proveedor hay en el camino.
+    previo: dict = {}
+
+    def preparar():
+        try:
+            previo["wifi"] = equipo_local.wifi()
+        except Exception:  # noqa: BLE001
+            previo["wifi"] = {}
+        try:
+            previo["proveedores"] = _detectar_proveedor(parar)
+        except Exception:  # noqa: BLE001
+            previo["proveedores"] = []
+
+    hilo = threading.Thread(target=preparar, daemon=True)
+    hilo.start()
 
     r["internet"] = medir(cloudflare(), duracion=duracion, parar=parar, progreso=aviso)
+    hilo.join(timeout=35)
+    r["wifi"] = previo.get("wifi") or {}
 
-    if not (parar and parar()):
-        aviso("Buscando los servidores de fast.com (Netflix)…")
-        srv = fastcom()
-        r["fast"] = (medir(srv, duracion=duracion, parar=parar, progreso=aviso) if srv else
-                     {"servidor": "fast.com (Netflix)", "bajada": None, "error": "fast.com no respondió"})
-
-    if not (parar and parar()):
-        aviso("Buscando el speedtest de tu proveedor…")
-        bases = [(p["nombre"], b) for p in _detectar_proveedor(parar) for b in p["bases"]]
+    alcanza = r["plan"] and (r["internet"].get("bajada") or 0) >= r["plan"]["bajada"] * 0.9
+    if not alcanza and not (parar and parar()):
+        bases = [(p["nombre"], b) for p in previo.get("proveedores") or [] for b in p["bases"]]
         if url_proveedor:
             bases.append(("tu proveedor", url_proveedor))
+        if bases:
+            aviso("Buscando el speedtest de tu proveedor…")
         for nombre, base in bases:
             if parar and parar():
                 break
             srv = buscar_librespeed(nombre, base)
             if srv:
-                r["proveedor"] = medir(srv, duracion=max(duracion * 0.75, 3), hilos=HILOS_PROVEEDOR,
-                                       parar=parar, progreso=aviso)
+                r["proveedor"] = medir(srv, duracion=duracion, hilos=HILOS_PROVEEDOR, parar=parar, progreso=aviso)
                 break
+        if not r["proveedor"] and not (parar and parar()):
+            aviso("Buscando los servidores de fast.com (Netflix)…")
+            srv = fastcom()
+            r["fast"] = (medir(srv, duracion=duracion, parar=parar, progreso=aviso) if srv else
+                         {"servidor": "fast.com (Netflix)", "bajada": None, "error": "fast.com no respondió"})
 
     if usar_ookla and not (parar and parar()):
         ruta = ookla_disponible()

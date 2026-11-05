@@ -471,7 +471,7 @@ class App:
         self.b_vel = ttk.Button(caja_v, text="Probar velocidad", style="Accion.TButton",
                                 command=self.probar_velocidad)
         self.b_vel.pack(side="left")
-        ttk.Label(caja_v, text="ej. 300 o 300/50 · bajada, subida y latencia con carga · usa datos (cerca de 1 minuto)",
+        ttk.Label(caja_v, text="ej. 300 o 300/50 · bajada, subida y latencia con carga · usa datos (entre 15 y 30 s)",
                   foreground="#64748b").pack(side="left", padx=10)
         self.control_vel = None
 
@@ -1132,7 +1132,7 @@ class App:
         self.control_vel = Control(progreso=lambda m: self.cola.put(("progreso", m)))
         self._ocupado(True)
         self.b_vel.configure(text="Detener", state="normal")
-        self.l_veredicto.configure(text="Midiendo la velocidad… (cerca de 1 minuto; no uses la conexión mientras tanto)",
+        self.l_veredicto.configure(text="Midiendo la velocidad… (entre 15 y 30 segundos; no uses la conexión mientras tanto)",
                                    background="#e2e8f0", foreground="#0f172a")
         ctl = self.control_vel
 

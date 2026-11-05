@@ -1,0 +1,36 @@
+name: Sumar mi proveedor de Internet
+description: Si tu proveedor tiene speedtest propio, Redportes puede medir «hasta tu proveedor» y ver tu IP interna (CGNAT)
+labels: ["proveedor"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Con esto, todos los clientes de tu proveedor van a poder ver si el plan llega completo hasta el proveedor y si lo lento es lo de afuera.
+        La prueba solo se usa cuando la conexión pasa por ese proveedor, así que no suma tiempo a los demás.
+  - type: input
+    id: nombre
+    attributes:
+      label: Proveedor y ciudad
+      placeholder: "Cooperativa Eléctrica de Ejemplo (Ciudad, Provincia)"
+    validations:
+      required: true
+  - type: input
+    id: speedtest
+    attributes:
+      label: Dirección del speedtest del proveedor
+      placeholder: "https://speedtest.ejemplo.com.ar"
+    validations:
+      required: true
+  - type: textarea
+    id: redportes
+    attributes:
+      label: Resultado de Redportes
+      description: |
+        Abrí Redportes, andá a la pestaña **Internet** y tocá **Probar solo Internet**. Después tocá **Copiar** y pegá el resultado acá.
+        Sirve para reconocer al proveedor por el nombre de sus routers. Si querés, tapá tu IP pública.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: ¿Algo más?
+      description: Por ejemplo, si el speedtest te muestra una IP 100.64.x.x, o si tiene otra dirección que solo funciona dentro de su red.
