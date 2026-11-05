@@ -23,9 +23,10 @@ from redportes.sistema import contexto_ssl, ejecutar_detallado
 
 CLOUDFLARE = "https://speed.cloudflare.com"
 AGENTE = f"Mozilla/5.0 (redportes {__version__})"
-DURACION = 8.0          # segundos por sentido
+DURACION = 7.0          # segundos por sentido
 CALENTAMIENTO = 1.5     # lo primero no cuenta: TCP todavía está acelerando
-HILOS = 4
+HILOS = 8               # hacia Internet: como Steam o fast.com, varias conexiones a la vez
+HILOS_PROVEEDOR = 4
 TOPE_BYTES = 2_000_000_000   # por sentido, por si la conexión es enorme
 _BLOQUE = 64 * 1024
 _RELLENO = os.urandom(1024 * 1024)
@@ -49,6 +50,7 @@ class Servidor:
         self.puerto = puerto
         self.verificar = verificar
         self.por_http = False
+        self.url_subida_fn = None     # fast.com: cada subida va a uno de sus servidores
 
     def contexto(self):
         if self.verificar:
@@ -62,6 +64,77 @@ class Servidor:
 def cloudflare() -> Servidor:
     return Servidor("Cloudflare", lambda n: f"{CLOUDFLARE}/__down?bytes={n}", f"{CLOUDFLARE}/__up",
                     "speed.cloudflare.com", 443)
+
+
+FAST = "https://fast.com"
+FAST_API = "https://api.fast.com/netflix/speedtest/v2"
+FAST_TOKEN = "YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm"   # el que trae fast.com; se busca uno nuevo en cada prueba
+
+
+def _token_fast(timeout: float = 6) -> str:
+    """fast.com no tiene API oficial: el token está en el JavaScript de la página."""
+    import re
+
+    try:
+        req = urllib.request.Request(FAST, headers={"User-Agent": AGENTE})
+        with urllib.request.urlopen(req, timeout=timeout, context=contexto_ssl()) as r:
+            html = r.read(200000).decode("utf-8", "replace")
+        js = re.search(r'src="(/app-[\w.]+\.js)"', html)
+        if js:
+            req = urllib.request.Request(FAST + js.group(1), headers={"User-Agent": AGENTE})
+            with urllib.request.urlopen(req, timeout=timeout, context=contexto_ssl()) as r:
+                m = re.search(r'token:"([A-Za-z0-9]+)"', r.read(3000000).decode("utf-8", "replace"))
+            if m:
+                return m.group(1)
+    except Exception:  # noqa: BLE001
+        pass
+    return FAST_TOKEN
+
+
+def parsear_fast(datos: dict) -> list[dict]:
+    """Respuesta de api.fast.com → [{"url", "ciudad", "pais"}]."""
+    destinos = datos.get("targets") if isinstance(datos, dict) else datos
+    res = []
+    for d in destinos or []:
+        if isinstance(d, dict) and d.get("url"):
+            loc = d.get("location") or {}
+            res.append({"url": d["url"], "ciudad": loc.get("city", ""), "pais": loc.get("country", "")})
+    return res
+
+
+def _rango(url: str, n: int) -> str:
+    """Los servidores de Netflix sirven N bytes en …/speedtest/range/0-N."""
+    p = urlsplit(url)
+    return p._replace(path=p.path.rstrip("/") + f"/range/0-{n}").geturl()
+
+
+def fastcom(timeout: float = 8) -> Servidor | None:
+    """Servidores de Netflix (Open Connect) más cercanos, como en fast.com. None si no responde."""
+    import itertools
+
+    try:
+        token = _token_fast()
+        req = urllib.request.Request(f"{FAST_API}?https=true&token={token}&urlCount=5",
+                                     headers={"User-Agent": AGENTE})
+        with urllib.request.urlopen(req, timeout=timeout, context=contexto_ssl()) as r:
+            destinos = parsear_fast(json.loads(r.read(200000)))
+    except Exception:  # noqa: BLE001
+        return None
+    if not destinos:
+        return None
+    ronda = itertools.cycle([d["url"] for d in destinos])
+    lock = threading.Lock()
+
+    def siguiente():
+        with lock:
+            return next(ronda)
+
+    lugar = ", ".join(x for x in (destinos[0]["ciudad"], destinos[0]["pais"]) if x)
+    host, puerto = _host_puerto(destinos[0]["url"])
+    srv = Servidor(f"fast.com (Netflix{' · ' + lugar if lugar else ''})", lambda n: _rango(siguiente(), n),
+                   "", host, puerto)
+    srv.url_subida_fn = lambda: _rango(siguiente(), 26_214_400)
+    return srv
 
 
 def _host_puerto(url: str) -> tuple[str, int]:
@@ -123,7 +196,8 @@ def latencia_http(srv: "Servidor", timeout: float = 3) -> float | None:
     """Plan B cuando no hay salida TCP directa (proxy de por medio): tiempo de un pedido vacío."""
     t0 = time.perf_counter()
     try:
-        with _abrir(srv, srv.url_bajada(0) if srv.nombre == "Cloudflare" else srv.url_subida,
+        with _abrir(srv, srv.url_bajada(0) if (srv.nombre == "Cloudflare" or srv.url_subida_fn)
+                    else srv.url_subida,
                     timeout=timeout) as r:
             r.read(100)
         return (time.perf_counter() - t0) * 1000
@@ -250,7 +324,7 @@ def _subir(srv: Servidor, cont: _Contador, hasta: float, parar, tam: int = 8 * 1
             yield pedazo
 
     try:
-        with _abrir(srv, srv.url_subida, data=cuerpo(), timeout=10,
+        with _abrir(srv, srv.url_subida_fn() if srv.url_subida_fn else srv.url_subida, data=cuerpo(), timeout=10,
                     cabeceras={"Content-Type": "application/octet-stream", "Content-Length": str(tam)}) as r:
             r.read(1000)
     except urllib.error.URLError as e:
@@ -362,6 +436,7 @@ def calificar_carga(reposo, con_carga) -> tuple[str, str]:
 def concluir(r: dict) -> dict:
     """Agrega estado, veredicto, qué hacer y la lista de pasos al resultado."""
     inet, prov, ook, plan, w = r.get("internet") or {}, r.get("proveedor"), r.get("ookla"), r.get("plan"), r.get("wifi") or {}
+    fast = r.get("fast")
     pasos, hacer = [], []
     estado = "ok"
 
@@ -371,16 +446,21 @@ def concluir(r: dict) -> dict:
         if orden.get(e, 0) > orden[estado]:
             estado = e
 
-    principal = inet if inet.get("bajada") else (ook if ook and ook.get("bajada") else None)
-    for m in (inet, prov, ook):
+    # El número principal es el mejor de los servidores «de Internet»: desde lugares alejados el camino
+    # a Cloudflare puede ser más lento que a Netflix, que suele tener servidores dentro del proveedor.
+    candidatos = [m for m in (inet, fast, ook) if m and m.get("bajada")]
+    principal = max(candidatos, key=lambda m: m["bajada"]) if candidatos else None
+    for m in (inet, fast, prov, ook):
         if not m:
             continue
         nombre = m["servidor"] if m is not inet else "Internet (Cloudflare)"
+        if m is principal and len(candidatos) > 1:
+            nombre += " ★"
         prefijo = ""
         if m is prov:
             nombre, prefijo = "Hasta tu proveedor", f"{m['servidor']}: "
         if m.get("bajada") is None and m.get("error"):
-            pasos.append((nombre, "falla", m["error"]))
+            pasos.append((nombre, "omitido" if candidatos else "falla", m["error"]))
             continue
         pasos.append((nombre, "info", f"{prefijo}bajada {_mbps(m.get('bajada'))} · subida {_mbps(m.get('subida'))} · "
                                       f"latencia {m.get('latencia') or '—'} ms · jitter {m.get('jitter') or '—'} ms"))
@@ -388,34 +468,50 @@ def concluir(r: dict) -> dict:
     if not principal:
         r.update(estado="falla", veredicto="No se pudo medir la velocidad.",
                  que_hacer=["Probá «Probar mi conexión»: puede que no haya Internet o que un proxy/firewall "
-                            "bloquee speed.cloudflare.com."], pasos=pasos)
+                            "bloquee speed.cloudflare.com y fast.com."], pasos=pasos)
         return r
 
     bajada, subida = principal["bajada"], principal.get("subida")
+    # Lo que el plan realmente entrega: el mejor número, contando el speedtest del proveedor. Los servidores
+    # lejanos rinden menos por conexión (latencia alta), aunque una descarga con muchas conexiones
+    # (Steam, actualizaciones) aproveche todo el plan: no hay que tomarlos como «la velocidad».
+    entrega, sube = bajada, subida
+    if prov and prov.get("bajada") and prov["bajada"] > bajada:
+        entrega = prov["bajada"]
+        sube = max(prov.get("subida") or 0, subida or 0) or None
     if principal.get("proxy"):
         pasos.append(("Salida por proxy", "info", "la red sale por un proxy: la latencia medida incluye al proxy"))
-    veredicto = f"Bajada {_mbps(bajada)} · subida {_mbps(subida)} · latencia {principal.get('latencia') or '—'} ms"
+    if fast and fast.get("bajada") and inet.get("bajada") and fast["bajada"] > inet["bajada"] * 1.5:
+        pasos.append(("Netflix vs Cloudflare", "info",
+                      f"a Netflix llega {_mbps(fast['bajada'])} y a Cloudflare {_mbps(inet['bajada'])}: tu plan rinde, "
+                      "pero el camino del proveedor hacia otros destinos es más angosto"))
+    if entrega > bajada * 1.5:
+        veredicto = (f"Tu conexión da {_mbps(entrega)} de bajada y {_mbps(sube)} de subida (hasta tu proveedor) · "
+                     f"a servidores lejanos: {_mbps(bajada)}")
+    else:
+        veredicto = f"Bajada {_mbps(bajada)} · subida {_mbps(subida)} · latencia {principal.get('latencia') or '—'} ms"
 
     # Plan contratado
     if plan:
-        pct = bajada / plan["bajada"] * 100
+        pct = entrega / plan["bajada"] * 100
         e = "ok" if pct >= 80 else "aviso" if pct >= 50 else "falla"
         detalle = f"bajada al {pct:.0f}% de {plan['bajada']:g} Mb/s"
-        if plan.get("subida") and subida:
-            detalle += f" · subida al {subida / plan['subida'] * 100:.0f}% de {plan['subida']:g} Mb/s"
+        if plan.get("subida") and sube:
+            detalle += f" · subida al {sube / plan['subida'] * 100:.0f}% de {plan['subida']:g} Mb/s"
         pasos.append(("Plan contratado", e, detalle))
         veredicto += f" ({pct:.0f}% del plan)"
         peor(e)
 
     # Proveedor vs Internet
     if prov and prov.get("bajada") and inet.get("bajada"):
-        if prov["bajada"] > inet["bajada"] * 1.5:
-            pasos.append(("¿Dónde está el límite?", "aviso",
-                          f"hasta el proveedor llega {_mbps(prov['bajada'])} pero hacia Internet {_mbps(inet['bajada'])}"))
-            hacer.append("Tu conexión hasta el proveedor anda bien: el límite está más allá (la salida a Internet del "
-                         "proveedor o el camino a ese servidor). Si pasa seguido, es para reclamarle al proveedor "
-                         "con estos números.")
-            peor("aviso")
+        if prov["bajada"] > bajada * 1.5:
+            pasos.append(("Servidores lejanos", "info",
+                          f"hasta el proveedor {_mbps(prov['bajada'])}, a {principal['servidor']} "
+                          f"({principal.get('latencia') or '—'} ms) {_mbps(bajada)}"))
+            hacer.append(f"Tu plan llega completo hasta el proveedor. Hacia servidores lejanos cada conexión rinde "
+                         f"menos por la distancia: es lo que miden muchos speedtests. Las descargas que abren varias "
+                         f"conexiones o bajan de servidores cercanos (Steam, actualizaciones, Netflix) sí usan todo el "
+                         f"plan. Solo es para reclamar si un servicio puntual anda lento siempre.")
         else:
             pasos.append(("¿Dónde está el límite?", "info",
                           "hasta el proveedor y hacia Internet da parecido: el límite es tu conexión "
@@ -450,13 +546,13 @@ def concluir(r: dict) -> dict:
             detalle += f", {w['banda']}"
         flojo = isinstance(senal, int) and senal < 60
         pasos.append(("Estás por Wi-Fi", "aviso" if flojo else "info", detalle))
-        lento = plan and bajada < plan["bajada"] * 0.8
+        lento = plan and entrega < plan["bajada"] * 0.8
         if flojo or lento:
             hacer.append("Estás midiendo por Wi-Fi" + (" con señal floja" if flojo else "") +
                          ": antes de culpar al proveedor, repetí la prueba con cable o al lado del router. "
                          "Si con cable da bien, el problema es el Wi-Fi, no la conexión.")
 
-    if plan and bajada < plan["bajada"] * 0.5 and not w:
+    if plan and entrega < plan["bajada"] * 0.5 and not w:
         hacer.append("Llega menos de la mitad del plan por cable: probá en otro horario y, si se repite, "
                      "reclamale al proveedor con el resultado (botón «Copiar resultado»).")
 
@@ -484,13 +580,19 @@ def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progr
 
     aviso = progreso or (lambda _m: None)
     r = {"version": __version__, "autor": __autor__, "fecha": time.strftime("%Y-%m-%d %H:%M"),
-         "plan": leer_plan(plan), "internet": {}, "proveedor": None, "ookla": None, "wifi": {}}
+         "plan": leer_plan(plan), "internet": {}, "fast": None, "proveedor": None, "ookla": None, "wifi": {}}
     try:
         r["wifi"] = equipo_local.wifi()
     except Exception:  # noqa: BLE001
         r["wifi"] = {}
 
     r["internet"] = medir(cloudflare(), duracion=duracion, parar=parar, progreso=aviso)
+
+    if not (parar and parar()):
+        aviso("Buscando los servidores de fast.com (Netflix)…")
+        srv = fastcom()
+        r["fast"] = (medir(srv, duracion=duracion, parar=parar, progreso=aviso) if srv else
+                     {"servidor": "fast.com (Netflix)", "bajada": None, "error": "fast.com no respondió"})
 
     if not (parar and parar()):
         aviso("Buscando el speedtest de tu proveedor…")
@@ -502,7 +604,8 @@ def ejecutar(plan=None, usar_ookla: bool = False, url_proveedor: str = "", progr
                 break
             srv = buscar_librespeed(nombre, base)
             if srv:
-                r["proveedor"] = medir(srv, duracion=max(duracion * 0.75, 3), parar=parar, progreso=aviso)
+                r["proveedor"] = medir(srv, duracion=max(duracion * 0.75, 3), hilos=HILOS_PROVEEDOR,
+                                       parar=parar, progreso=aviso)
                 break
 
     if usar_ookla and not (parar and parar()):

@@ -2,6 +2,11 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.13.1] - 2026-11-04
+- **La prueba de velocidad ya no culpa al proveedor por los servidores lejanos.** Si hasta tu proveedor llega el plan completo, el resultado lo dice así («tu conexión da 290 Mb/s… a servidores lejanos: 60») y el % del plan se calcula con eso. Lejos, cada conexión rinde menos por la latencia; las descargas con muchas conexiones (Steam, actualizaciones) sí usan todo el plan.
+- Se suma **fast.com** (servidores de Netflix, que suelen estar dentro del proveedor o cerca). El número principal es el mejor de los servidores de Internet, marcado con ★.
+- Hacia Internet ahora se usan 8 conexiones en paralelo en vez de 4.
+
 ## [0.13.0] - 2026-11-04
 - **Prueba de velocidad** (pestaña *Diagnóstico* o `redportes velocidad`): bajada, subida, latencia y jitter contra Cloudflare, con varias conexiones en paralelo como los speedtests de verdad.
 - **Latencia con carga (bufferbloat):** mide el ping *mientras* baja y sube. Si se dispara, explica por qué se cortan las videollamadas cuando alguien descarga y cómo arreglarlo en el router (SQM/QoS, cola cake en MikroTik).

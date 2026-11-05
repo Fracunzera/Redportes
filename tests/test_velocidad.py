@@ -121,11 +121,37 @@ def _medida(nombre, bajada, subida, lat=10, lat_b=15, lat_s=18):
 
 
 def test_concluir_proveedor_rapido_internet_lento():
-    r = v.concluir({"internet": _medida("Cloudflare", 80, 20),
-                    "proveedor": _medida("SS Servicios", 290, 50), "plan": v.leer_plan("300/50")})
-    assert r["estado"] == "falla"           # 27% del plan
-    assert "27% del plan" in r["veredicto"]
-    assert any("más allá" in q for q in r["que_hacer"])
+    # Caso real de Río Gallegos: el plan llega completo, los servidores lejanos dan menos.
+    r = v.concluir({"internet": _medida("Cloudflare", 60, 48, lat=48),
+                    "proveedor": _medida("SS Servicios", 290, 293), "plan": v.leer_plan("300")})
+    assert r["estado"] == "ok"
+    assert "97% del plan" in r["veredicto"] and "290 Mb/s" in r["veredicto"]
+    assert any("Steam" in q for q in r["que_hacer"])
+    assert not any("reclamale" in q for q in r["que_hacer"])
+
+
+def test_concluir_lento_de_verdad():
+    r = v.concluir({"internet": _medida("Cloudflare", 80, 20), "plan": v.leer_plan("300/50")})
+    assert r["estado"] == "falla" and "27% del plan" in r["veredicto"]
+    assert any("reclamale" in q for q in r["que_hacer"])
+
+
+def test_concluir_elige_el_mejor_y_fast():
+    r = v.concluir({"internet": _medida("Cloudflare", 60, 40),
+                    "fast": _medida("fast.com (Netflix · Buenos Aires, AR)", 280, 45), "plan": v.leer_plan("300")})
+    assert r["estado"] == "ok" and "280 Mb/s" in r["veredicto"]
+    assert any(p[0] == "Netflix vs Cloudflare" for p in r["pasos"])
+    assert any(p[0].endswith("★") for p in r["pasos"])
+
+
+def test_parsear_fast_y_rango():
+    datos = {"targets": [{"url": "https://ipv4-c001-rgl001-ix.1.oca.nflxvideo.net/speedtest?c=ar&n=1&e=9&t=x",
+                          "location": {"city": "Buenos Aires", "country": "AR"}}]}
+    d = v.parsear_fast(datos)
+    assert d == [{"url": datos["targets"][0]["url"], "ciudad": "Buenos Aires", "pais": "AR"}]
+    assert v._rango(d[0]["url"], 1000) == ("https://ipv4-c001-rgl001-ix.1.oca.nflxvideo.net/speedtest/range/0-1000"
+                                            "?c=ar&n=1&e=9&t=x")
+    assert v.parsear_fast({}) == []
 
 
 def test_concluir_bufferbloat_y_wifi():
