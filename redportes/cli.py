@@ -328,6 +328,20 @@ def cmd_dns(args) -> int:
     return 0
 
 
+def cmd_velocidad(args) -> int:
+    from redportes import config, velocidad
+
+    cfg = config.leer()
+    if args.plan:
+        cfg["plan"] = args.plan
+        config.guardar(cfg)
+    r = velocidad.ejecutar(plan=args.plan or cfg.get("plan"), usar_ookla=args.ookla,
+                           url_proveedor=cfg.get("url_proveedor", ""), progreso=_progreso)
+    print()
+    print(velocidad.como_texto(r))
+    return 0 if r["estado"] != "falla" else 1
+
+
 def cmd_equipo(_args) -> int:
     from redportes import equipo_local
 
@@ -441,6 +455,10 @@ def construir_parser() -> argparse.ArgumentParser:
     dn.add_argument("pagina", help="dominio o dirección completa, ej. https://www.ejemplo.com/algo")
     dn.set_defaults(func=cmd_dns)
 
+    ve = sub.add_parser("velocidad", help="prueba de velocidad: Internet, hasta tu proveedor y latencia con carga")
+    ve.add_argument("--plan", help="velocidad contratada en Mb/s, ej. 300 o 300/50 (se recuerda)")
+    ve.add_argument("--ookla", action="store_true", help="sumar la prueba oficial de Ookla si está instalada")
+    ve.set_defaults(func=cmd_velocidad)
     sub.add_parser("equipo", help="configuración de esta computadora: red, Wi-Fi, sistema"
                    ).set_defaults(func=cmd_equipo)
 

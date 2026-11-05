@@ -2,6 +2,15 @@
 
 Todas las versiones de Redportes. La más nueva, arriba.
 
+## [0.13.0] - 2026-11-04
+- **Prueba de velocidad** (pestaña *Diagnóstico* o `redportes velocidad`): bajada, subida, latencia y jitter contra Cloudflare, con varias conexiones en paralelo como los speedtests de verdad.
+- **Latencia con carga (bufferbloat):** mide el ping *mientras* baja y sube. Si se dispara, explica por qué se cortan las videollamadas cuando alguien descarga y cómo arreglarlo en el router (SQM/QoS, cola cake en MikroTik).
+- **Hasta tu proveedor:** si la conexión pasa por un proveedor conocido con speedtest propio (por ahora SS Servicios) o por la página que cargaste en *Herramientas → Página de mi proveedor*, mide también contra él y compara: «hasta el proveedor 290 Mb/s, hacia Internet 80 Mb/s → el límite está más allá de tu conexión».
+- **Plan contratado:** cargás «300» o «300/50» y te dice qué porcentaje estás recibiendo. Se recuerda para la próxima.
+- Si estás por **Wi-Fi** con señal floja, te avisa que repitas la prueba con cable antes de culpar al proveedor.
+- **Ookla opcional:** si tenés instalado el `speedtest` oficial y lo activás en *Herramientas*, se suma su resultado (con el enlace para compartir).
+- Funciona aunque la red salga por un proxy.
+
 ## [0.12.1] - 2026-11-04
 - La IP interna que ve el proveedor ahora se lee clara: «IP WAN del router: 100.64.x.x (según el speedtest de SS Servicios)», y aparece como primera conclusión de la salida a Internet.
 - SS Servicios: también se consulta su speedtest interno (`web.sslocal/speedtest`), que solo existe dentro de su red. Desde otras redes no resuelve y se saltea al instante.

@@ -80,6 +80,7 @@ No hace falta saber nada de GitHub: tocá uno de los botones de arriba y listo.
 - **Cómo sale a Internet** (opcional, con `--internet`): saltos hasta Internet, doble NAT, CGNAT, IP pública y qué DNS usa.
 - **Qué se ve desde Internet** (con `--internet`): consulta pasiva a [Shodan InternetDB](https://internetdb.shodan.io/) sobre la IP pública: puertos publicados (RDP, cámaras, Winbox…) y vulnerabilidades conocidas. No escanea nada; con CGNAT avisa que esa IP no es de tu red.
 - **Diagnóstico de conexión** (pestaña *Diagnóstico* o `redportes diagnostico`): ping al router y a Internet con pérdida, latencia y jitter, prueba de cada DNS configurado contra uno público y navegación HTTPS real. Dice en castellano si el problema es la red local, el proveedor o el DNS, y se copia con un botón para pegarlo en un chat o ticket.
+- **Prueba de velocidad** (pestaña *Diagnóstico* o `redportes velocidad`): bajada, subida y latencia contra Cloudflare, **latencia con carga** (bufferbloat, lo que corta las videollamadas cuando alguien descarga) con cómo arreglarlo, comparación **hasta tu proveedor** cuando tiene speedtest propio, **porcentaje del plan contratado** y aviso si estás midiendo por Wi-Fi con señal floja. Ookla opcional si lo tenés instalado.
 - **¿No abre una página?** Pegás la dirección y prueba en orden Internet, DNS (los de la PC contra los públicos), archivo hosts, conexión, HTTPS y certificado, respuesta del sitio y MTU. Te dice en una frase cuál es la causa y qué hacer: caché DNS vieja, bloqueo de AdGuard/Pi-hole, proxy que intercepta, certificado vencido, sitio caído o MTU bajo.
 - **Este equipo** (pestaña o `redportes equipo`): la configuración de la PC desde la que escaneás. IP, máscara, MAC, si viene por DHCP (y de qué servidor) o es fija, velocidad y dúplex del enlace, MTU, Wi-Fi (red, señal, canal, banda, seguridad), proxy, firewall, archivo hosts, sistema, RAM y disco. Avisa lo que suele dar problemas: cable negociando a 100 Mb/s, señal débil, Wi-Fi abierto o WEP, IP fija, firewall apagado, IP 169.254.
 - **Informe para compartir**: una copia con IPs, MACs y nombres tapados, para publicar capturas o pedir ayuda sin exponer la red.
@@ -147,6 +148,7 @@ redportes diagnostico                          # ¿anda mal la red, el proveedor
 redportes pagina https://www.ejemplo.com       # ¿por qué no abre esta página?
 redportes equipo                               # configuración de esta computadora
 redportes internet                             # solo la salida a Internet (sin escanear la red)
+redportes velocidad --plan 300/50              # velocidad, latencia con carga y % del plan
 ```
 
 ## Redes grandes

@@ -124,6 +124,9 @@ class App:
         self.v_usar_nmap = tk.BooleanVar(value=config.leer().get("usar_nmap", True))
         herr.add_checkbutton(label="Usar nmap (si está instalado)", variable=self.v_usar_nmap,
                              command=self._guardar_usar_nmap)
+        self.v_usar_ookla = tk.BooleanVar(value=config.leer().get("usar_ookla", False))
+        herr.add_checkbutton(label="Sumar Ookla a la prueba de velocidad (si está instalado)",
+                             variable=self.v_usar_ookla, command=self._guardar_usar_ookla)
         herr.add_command(label="Actualizar la lista de fabricantes", command=self.actualizar_oui)
         herr.add_command(label="Página de mi proveedor que muestra la IP interna…", command=self.configurar_proveedor)
         herr.add_separator()
@@ -177,6 +180,17 @@ class App:
         cfg["url_proveedor"] = url.strip()
         config.guardar(cfg)
         self.v_estado.set("Página del proveedor guardada: se usa al escanear con «salida a Internet».")
+
+    def _guardar_usar_ookla(self):
+        from redportes import config, velocidad
+
+        cfg = config.leer()
+        cfg["usar_ookla"] = self.v_usar_ookla.get()
+        config.guardar(cfg)
+        if self.v_usar_ookla.get() and not velocidad.ookla_disponible():
+            messagebox.showinfo("Redportes", "No encontré el speedtest oficial de Ookla en este equipo.\n\n"
+                                "Se baja gratis de speedtest.net/apps/cli (uso personal). Cuando esté "
+                                "instalado, la prueba de velocidad lo suma sola.")
 
     def _guardar_usar_nmap(self):
         from redportes import config
@@ -386,6 +400,8 @@ class App:
         return t
 
     def _armar_pestanas(self):
+        from redportes import config
+
         self.nb = ttk.Notebook(self.raiz)
         self.nb.pack(fill="both", expand=True, padx=12)
 
@@ -445,11 +461,25 @@ class App:
                                    command=self.averiguar_pagina)
         self.b_pagina.pack(side="left")
 
-        self.l_veredicto = tk.Label(p6, text="Elegí una de las dos pruebas.", anchor="w", justify="left",
+        caja_v = ttk.LabelFrame(p6, text=" Velocidad ", padding=8)
+        caja_v.pack(fill="x", pady=(10, 0))
+        ttk.Label(caja_v, text="Plan contratado (Mb/s, opcional):").pack(side="left")
+        self.v_plan = tk.StringVar(value=str(config.leer().get("plan", "")))
+        e_plan = ttk.Entry(caja_v, textvariable=self.v_plan, width=10)
+        e_plan.pack(side="left", padx=6)
+        e_plan.bind("<Return>", lambda _e: self.probar_velocidad())
+        self.b_vel = ttk.Button(caja_v, text="Probar velocidad", style="Accion.TButton",
+                                command=self.probar_velocidad)
+        self.b_vel.pack(side="left")
+        ttk.Label(caja_v, text="ej. 300 o 300/50 · bajada, subida y latencia con carga · usa datos (unos 40 s)",
+                  foreground="#64748b").pack(side="left", padx=10)
+        self.control_vel = None
+
+        self.l_veredicto = tk.Label(p6, text="Elegí una de las pruebas.", anchor="w", justify="left",
                                     font=("TkDefaultFont", 12, "bold"), background="#e2e8f0", foreground="#0f172a",
                                     padx=12, pady=10, wraplength=900)
         self.l_veredicto.pack(fill="x", pady=(12, 0))
-        self.txt_hacer = tk.Text(p6, height=4, wrap="word", relief="flat", padx=12, pady=6,
+        self.txt_hacer = tk.Text(p6, height=5, wrap="word", relief="flat", padx=12, pady=6,
                                  background="#f8fafc", font="TkDefaultFont")
         self.txt_hacer.pack(fill="x")
         self.t_diag = self._tabla(p6, {"Prueba": 260, "Resultado": 600})
@@ -717,6 +747,8 @@ class App:
                     self._mostrar_equipo_local(dato)
                 elif tipo == "pagina":
                     self._mostrar_pagina(dato)
+                elif tipo == "velocidad":
+                    self._mostrar_velocidad(dato)
                 elif tipo == "diag":
                     self._mostrar_diagnostico(dato)
                 elif tipo == "oui":
@@ -997,6 +1029,8 @@ class App:
         estado = "disabled" if si else "normal"
         self.b_diag.configure(state=estado)
         self.b_pagina.configure(state=estado)
+        if not self.control_vel:
+            self.b_vel.configure(state=estado)
         if si:
             self.barra.start(12)
         else:
@@ -1079,6 +1113,52 @@ class App:
         self._resultado(r["estado"], r["veredicto"], r["que_hacer"],
                         [(p["nombre"], p["estado"], p["detalle"]) for p in r["pasos"]], pagina.como_texto(r))
         self.v_estado.set(f"Listo: {r['dominio']}.")
+
+    def probar_velocidad(self):
+        from redportes import config, velocidad
+        from redportes.control import Control
+
+        if self.control_vel:            # el botón dice «Detener»
+            self.control_vel.detener()
+            self.b_vel.configure(state="disabled")
+            return
+        plan = self.v_plan.get().strip()
+        if plan and not velocidad.leer_plan(plan):
+            messagebox.showinfo("Redportes", "El plan va en Mb/s, por ejemplo 300 o 300/50 (bajada/subida).")
+            return
+        cfg = config.leer()
+        cfg["plan"] = plan
+        config.guardar(cfg)
+        self.control_vel = Control(progreso=lambda m: self.cola.put(("progreso", m)))
+        self._ocupado(True)
+        self.b_vel.configure(text="Detener", state="normal")
+        self.l_veredicto.configure(text="Midiendo la velocidad… (unos 40 segundos; no uses la conexión mientras tanto)",
+                                   background="#e2e8f0", foreground="#0f172a")
+        ctl = self.control_vel
+
+        def trabajo():
+            try:
+                r = velocidad.ejecutar(plan=plan, usar_ookla=cfg.get("usar_ookla", False),
+                                       url_proveedor=cfg.get("url_proveedor", ""),
+                                       progreso=lambda m: self.cola.put(("progreso", m)), parar=ctl.cancelado)
+                self.cola.put(("velocidad", r))
+            except Exception as e:  # noqa: BLE001
+                self.cola.put(("velocidad", {"error": str(e)}))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _mostrar_velocidad(self, r: dict):
+        from redportes import velocidad
+
+        self.control_vel = None
+        self.b_vel.configure(text="Probar velocidad")
+        self._ocupado(False)
+        if "error" in r:
+            self._resultado("falla", f"No se pudo medir: {r['error']}", [], [], "")
+            return
+        veredicto = r["veredicto"] + ("  (detenida antes de terminar)" if r.get("cancelado") else "")
+        self._resultado(r["estado"], veredicto, r["que_hacer"], r["pasos"], velocidad.como_texto(r))
+        self.v_estado.set("Prueba de velocidad terminada.")
 
     def copiar_resultado(self):
         if self.texto_resultado:

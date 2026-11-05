@@ -28,13 +28,14 @@ DNS_CONOCIDOS = {
 }
 
 
-def comando_traza() -> list[str] | None:
+def comando_traza(saltos: int = 15, rapido: bool = False) -> list[str] | None:
     if ES_WINDOWS:
-        return ["tracert", "-d", "-h", "15", "-w", "1500", DESTINO]
+        return ["tracert", "-d", "-h", str(saltos), "-w", "800" if rapido else "1500", DESTINO]
     if tiene("traceroute"):
-        return ["traceroute", "-n", "-q", "2", "-w", "2", "-m", "15", DESTINO]
+        return ["traceroute", "-n", "-q", "1" if rapido else "2", "-w", "1" if rapido else "2",
+                "-m", str(saltos), DESTINO]
     if tiene("tracepath"):
-        return ["tracepath", "-n", "-m", "15", DESTINO]
+        return ["tracepath", "-n", "-m", str(saltos), DESTINO]
     return None
 
 
